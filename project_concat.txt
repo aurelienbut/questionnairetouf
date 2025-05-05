@@ -1,3 +1,101 @@
+--- Concatenation du projet : C:\Users\aurel\Documents\full of doc\touff questionnaire ---
+--- Généré le : 2025-05-05 18:07:09.317404 ---
+
+--- Fichiers Inclus (3) ---
+- api\submit-quiz.js
+- index.html
+- package.json
+
+========================================
+
+--- Début du fichier : api\submit-quiz.js ---
+
+// Importer la librairie Airtable
+import Airtable from 'airtable';
+
+// Fonction handler principale pour Vercel
+export default async function handler(request, response) {
+  // 1. Vérifier que la méthode est POST
+  if (request.method !== 'POST') {
+    response.setHeader('Allow', ['POST']);
+    return response.status(405).json({ error: `Méthode ${request.method} non autorisée` });
+  }
+
+  // 2. Récupérer les secrets Airtable depuis les variables d'environnement
+  const { AIRTABLE_API_KEY, AIRTABLE_BASE_ID, AIRTABLE_TABLE_NAME } = process.env;
+
+  if (!AIRTABLE_API_KEY || !AIRTABLE_BASE_ID || !AIRTABLE_TABLE_NAME) {
+    console.error("Erreur Critique: Variables d'environnement Airtable (API_KEY, BASE_ID, TABLE_NAME) manquantes !");
+    return response.status(500).json({ error: "Erreur de configuration du serveur." });
+  }
+
+  // 3. Initialiser la connexion à Airtable
+  try {
+    const base = new Airtable({ apiKey: AIRTABLE_API_KEY }).base(AIRTABLE_BASE_ID);
+    const table = base(AIRTABLE_TABLE_NAME);
+
+    // 4. Récupérer et valider les données du corps de la requête
+    const data = request.body;
+
+    // Vérification (Assurez-vous que ScoreTotal existe bien, même si 0)
+    if (!data || typeof data !== 'object' || !data.Email || data.ScoreTotal === undefined ) {
+        console.warn("Données reçues invalides ou manquantes:", data);
+        return response.status(400).json({ error: "Les données envoyées sont incomplètes ou mal formatées." });
+    }
+
+    // ---> AJOUT LOG 1 : Voir les données reçues <---
+    // Affiche l'objet entier reçu du frontend pour vérification
+    console.log('[BACKEND LOG 1] Données reçues (request.body):', JSON.stringify(data, null, 2));
+
+    // 5. Préparer l'objet à envoyer à Airtable
+    const recordFields = {
+      'Prénom': data.Prenom,
+      'Nom': data.Nom,
+      'Email': data.Email,
+      'Score Total': data.ScoreTotal, // C'est le pourcentage maintenant
+      'Niveau Maturité': data.NiveauMaturite,
+      'Taille Flotte': data.TailleFlotte,
+      'Mix Énergétique': data.MixEnergetique,
+      'Suivi CO2': data.SuiviCO2,
+      'Politique RSE': data.PolitiqueRSE,
+      'Enjeu Prioritaire': data.EnjeuPrioritaire,
+      // Rappel: retirer la ligne 'Date Soumission' si vous utilisez un champ 'Created time' dans Airtable
+    };
+
+    // ---> AJOUT LOG 2 : Voir les données préparées pour Airtable <---
+    // Affiche l'objet exact qui sera envoyé à la fonction .create d'Airtable
+    console.log('[BACKEND LOG 2] Données préparées pour Airtable (recordFields):', JSON.stringify(recordFields, null, 2));
+
+    // 6. Envoyer les données pour créer un enregistrement dans Airtable
+    const createdRecords = await table.create([{ fields: recordFields }]);
+
+    // 7. Confirmer le succès au frontend
+    console.log(`Enregistrement Airtable créé avec succès: ${createdRecords[0].getId()}`);
+    return response.status(201).json({ success: true, message: "Résultats enregistrés avec succès." });
+
+  } catch (error) {
+    // ---> AJOUT LOG 3 : Afficher l'erreur exacte interceptée <---
+    // C'est le log le plus important si une erreur se produit !
+    console.error("[BACKEND LOG 3] ERREUR DANS LE BLOC CATCH:", error);
+
+    // 8. Gérer les erreurs potentielles (code inchangé ici)
+    let errorMessage = "Une erreur interne est survenue lors de l'enregistrement.";
+    let statusCode = 500;
+    if (error.statusCode) {
+        statusCode = error.statusCode;
+        errorMessage = `Erreur lors de la communication avec la base de données (${error.statusCode}).`;
+        if (statusCode === 422) {
+            errorMessage = "Certaines données fournies ne correspondent pas au format attendu par la base de données.";
+        }
+    }
+    return response.status(statusCode).json({ error: errorMessage });
+  }
+}
+
+--- Fin du fichier : api\submit-quiz.js ---
+
+--- Début du fichier : index.html ---
+
 <!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -19,7 +117,7 @@
     const { useState, useEffect } = React;
 
     function RSEQuiz() {
-      // --- MODIFICATION : Gestion des étapes ---
+      // --- MODIFICATION     : Gestion des étapes ---
       const [quizStep, setQuizStep] = useState('quiz'); // 'quiz', 'userInfo', 'results'
       const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
       const [answers, setAnswers] = useState(Array(5).fill(null));
@@ -158,46 +256,50 @@
         // 2. Commencer l'envoi si valide
         setSubmissionStatus('submitting');
 
-        // 3. Préparer les données complètes
-        const finalScore = score; // Le score a été calculé par useEffect
-        const maturityInfo = getMaturityLevel(finalScore);
+        // 3. Recalculer le score BRUT (nécessaire pour le % et potentiellement le niveau)
+        const calculatedScoreForSending = answers.reduce((sum, ans, idx) =>
+            sum + (ans != null ? questions[idx].options[ans].score : 0)
+        , 0);
+        console.log('[FRONTEND LOG 2a] Score BRUT recalculé:', calculatedScoreForSending); // Log du score brut
+
+        // 4. --- NOUVEAU : Calculer le pourcentage comme pour l'affichage ---
+        const percentageScore = Math.round((calculatedScoreForSending / maxScore) * 100);
+        console.log('[FRONTEND LOG 2b] Pourcentage calculé pour envoi:', percentageScore); // Log du pourcentage
+
+        // 5. Préparer les données complètes
+        // Utilise toujours le score BRUT pour déterminer le niveau, car la fonction getMaturityLevel est basée dessus
+        const maturityInfo = getMaturityLevel(calculatedScoreForSending);
 
         const dataToSend = {
-           // Infos utilisateur
            Prenom: userInfo.firstName,
            Nom: userInfo.lastName,
            Email: userInfo.email,
-           // Résultats du quiz
-           ScoreTotal: finalScore,
+           // --- MODIFICATION : Envoyer le pourcentage arrondi ---
+           ScoreTotal: percentageScore, // <-- ENVOIE LE POURCENTAGE CALCULÉ
+           // ----------------------------------------------------
            NiveauMaturite: maturityInfo.level,
+           // ... autres champs réponses ...
         };
 
-        questions.forEach((q, idx) => {
-            const fieldName = q.airtableFieldName || q.title.replace(/[^a-zA-Z0-9]/g, '');
-            dataToSend[fieldName] = answers[idx] != null ? q.options[answers[idx]].text : "Sans réponse";
-        });
+         questions.forEach((q, idx) => {
+             const fieldName = q.airtableFieldName || q.title.replace(/[^a-zA-Z0-9]/g, '');
+             dataToSend[fieldName] = answers[idx] != null ? q.options[answers[idx]].text : "Sans réponse";
+         });
 
-        // 4. Envoyer les données
+        // Mettre à jour le log pour refléter l'envoi du pourcentage
+        console.log('[FRONTEND LOG 3] Objet dataToSend (ScoreTotal est le %):', JSON.stringify(dataToSend));
+
+        // 6. Envoyer les données (try/catch/fetch reste inchangé)
         try {
-          const response = await fetch('/api/submit-quiz', { // !! Endpoint Backend !!
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(dataToSend),
-          });
-
+          const response = await fetch('/api/submit-quiz', { /* ... */ });
           if (!response.ok) throw new Error(`Erreur HTTP: ${response.status}`);
-
-          console.log('Données envoyées avec succès.');
+          console.log('Données (avec %) envoyées avec succès.');
           setSubmissionStatus('success');
-          // --- MODIFICATION : Passer à l'étape des résultats APRÈS succès ---
           setQuizStep('results');
-
         } catch (error) {
-          console.error("Erreur lors de l'envoi:", error);
-          setSubmissionStatus('error');
-          setTimeout(() => {
-            if(submissionStatus === 'error') setSubmissionStatus('idle');
-          }, 5000);
+           console.error("[FRONTEND LOG 4] Erreur dans le catch fetch:", error);
+           setSubmissionStatus('error');
+           setTimeout(() => { if(submissionStatus === 'error') setSubmissionStatus('idle'); }, 5000);
         }
       };
 
@@ -427,3 +529,16 @@
   </script>
 </body>
 </html>
+
+--- Fin du fichier : index.html ---
+
+--- Début du fichier : package.json ---
+
+{
+  "dependencies": {
+    "airtable": "^0.12.2"
+  }
+}
+
+
+--- Fin du fichier : package.json ---
