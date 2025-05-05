@@ -13,15 +13,10 @@
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
   <style>
-    /* Ajout d'une animation simple pour la transition entre étapes/questions */
+    /* Styles pour animations et états désactivés */
     @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
     .animate-fade-in { animation: fadeIn 0.5s ease-out forwards; }
-
-    /* Style pour le bouton de soumission désactivé */
-    button:disabled {
-        cursor: not-allowed;
-        opacity: 0.6;
-    }
+    button:disabled { cursor: not-allowed; opacity: 0.6; }
   </style>
 </head>
 <body class="bg-gray-100 flex items-center justify-center min-h-screen p-4">
@@ -30,113 +25,113 @@
   <script type="text/babel">
     const { useState, useEffect } = React;
 
+    // --- Composant principal du Quiz Logistique ---
     function FleetLogisticsQuiz() {
-      // --- Gestion des étapes ---
-      const [quizStep, setQuizStep] = useState('quiz'); // 'quiz', 'userInfo', 'results'
-      const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
-      const [animateQuestion, setAnimateQuestion] = useState(true);
-      const [submissionStatus, setSubmissionStatus] = useState('idle'); // 'idle', 'submitting', 'success', 'error'
+      // --- États du composant ---
+      const [quizStep, setQuizStep] = useState('quiz'); // Gère l'étape actuelle: 'quiz', 'userInfo', 'results'
+      const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0); // Index de la question affichée
+      const [animateQuestion, setAnimateQuestion] = useState(true); // Pour l'effet de transition entre questions
+      const [submissionStatus, setSubmissionStatus] = useState('idle'); // État de la soumission: 'idle', 'submitting', 'success', 'error'
+      const [score, setScore] = useState(0); // Score brut calculé
+      const [animateScore, setAnimateScore] = useState(false); // Pour animer le cercle de score
 
-      // --- Nouvelles questions (Logistique & Achats) ---
-      // Note: Pas de 'score' ici, car non défini dans les specs.
+      // --- Définition des Questions du Quiz Logistique avec leurs scores ---
+      // !! VALIDEZ CES SCORES !! Ils déterminent maxScore et les niveaux.
       const questions = [
-        {
-          id: 1,
-          title: "Taille de la flotte",
-          question: "Combien de véhicules gérez-vous actuellement dans votre flotte logistique ?", // Ajusté pour contexte Logistique
-          options: [
-            { text: "Moins de 20" },
-            { text: "Entre 20 et 100" },
-            { text: "Entre 100 et 500" },
-            { text: "Plus de 500" }
-          ],
-          airtableFieldName: "TailleFlotte" // Gardé le même nom, à vérifier si besoin de distinction
-        },
-        {
-          id: 2,
-          title: "Mode d’acquisition (CapEx / OpEx)",
-          question: "Quel est votre mode d’acquisition majoritaire ?",
-          options: [
-            { text: "100 % propriété" },
-            { text: "Mix LLD/propriété" },
-            { text: "Majorité LLD" },
-            { text: "100 % externalisé (full outsource)" }
-          ],
-          airtableFieldName: "ModeAcquisition" // Nouveau champ
-        },
-        {
-          id: 3,
-          title: "Suivi du TCO",
-          question: "Disposez‑vous d’un suivi consolidé du coût total de possession (TCO) ?",
-          options: [
-            { text: "Non" },
-            { text: "Oui, ponctuel" },
-            { text: "Oui, en continu" }
-          ],
-          airtableFieldName: "SuiviTCO" // Nouveau champ
-        },
-        {
-          id: 4,
-          title: "Politique Achats Durables",
-          question: "Intégrez‑vous déjà des critères RSE dans vos appels d’offres véhicules ?",
-          options: [
-            { text: "Non" },
-            { text: "Projet" },
-            { text: "Oui, formalisé" }
-          ],
-          airtableFieldName: "PolitiqueAchatsRSE" // Nouveau champ
-        },
-        {
-          id: 5,
-          title: "Enjeu prioritaire",
-          question: "Quelle est votre priorité aujourd’hui ?",
-          options: [
-            { text: "Baisser le prix d’achat" },
-            { text: "Optimiser contrats maintenance" },
-            { text: "Décarboner la flotte" },
-            { text: "Simplifier le process commande" }
-          ],
-          airtableFieldName: "EnjeuPrioritaire" // Gardé le même nom, à vérifier
-        }
+         {
+            id: 1, title: "Taille de la flotte", question: "Combien de véhicules gérez-vous actuellement dans votre flotte logistique ?",
+            options: [ { text: "Moins de 20", score: 1 }, { text: "Entre 20 et 100", score: 2 }, { text: "Entre 100 et 500", score: 3 }, { text: "Plus de 500", score: 4 } ],
+            airtableFieldName: "TailleFlotte" // Utilisé par l'API pour savoir quel champ envoyer
+          },
+          {
+            id: 2, title: "Mode d’acquisition (CapEx / OpEx)", question: "Quel est votre mode d’acquisition majoritaire ?",
+            options: [ { text: "100 % propriété", score: 1 }, { text: "Mix LLD/propriété", score: 2 }, { text: "Majorité LLD", score: 3 }, { text: "100 % externalisé (full outsource)", score: 4 } ],
+            airtableFieldName: "ModeAcquisition"
+          },
+          {
+            id: 3, title: "Suivi du TCO", question: "Disposez‑vous d’un suivi consolidé du coût total de possession (TCO) ?",
+            options: [ { text: "Non", score: 1 }, { text: "Oui, ponctuel", score: 2 }, { text: "Oui, en continu", score: 3 } ],
+            airtableFieldName: "SuiviTCO"
+          },
+          {
+            id: 4, title: "Politique Achats Durables", question: "Intégrez‑vous déjà des critères RSE dans vos appels d’offres véhicules ?",
+            options: [ { text: "Non", score: 1 }, { text: "Projet", score: 2 }, { text: "Oui, formalisé", score: 3 } ],
+            airtableFieldName: "PolitiqueAchatsRSE"
+          },
+          {
+            id: 5, title: "Enjeu prioritaire", question: "Quelle est votre priorité aujourd’hui ?",
+            options: [ { text: "Baisser le prix d’achat", score: 1 }, { text: "Optimiser contrats maintenance", score: 2 }, { text: "Décarboner la flotte", score: 3 }, { text: "Simplifier le process commande", score: 1 } ],
+            airtableFieldName: "EnjeuPrioritaire"
+          }
       ];
 
       const totalQuestions = questions.length;
-      const [answers, setAnswers] = useState(Array(totalQuestions).fill(null)); // Initialisation basée sur totalQuestions
+      // Initialise un tableau pour stocker l'index de la réponse choisie pour chaque question
+      const [answers, setAnswers] = useState(Array(totalQuestions).fill(null));
+
+      // --- Calcul dynamique du score maximum possible ---
+      const maxScore = questions.reduce((max, q) => {
+          const maxOptionScore = q.options.length > 0 ? Math.max(...q.options.map(opt => opt.score || 0)) : 0;
+          return max + maxOptionScore;
+      }, 0); // Actuellement: 4 + 4 + 3 + 3 + 3 = 17 (si scores non modifiés)
 
       // --- États pour les informations utilisateur ---
-      const [userInfo, setUserInfo] = useState({
-        firstName: '',
-        lastName: '',
-        email: ''
-      });
-      const [userInfoErrors, setUserInfoErrors] = useState({});
+      const [userInfo, setUserInfo] = useState({ firstName: '', lastName: '', email: '' });
+      const [userInfoErrors, setUserInfoErrors] = useState({}); // Pour la validation du formulaire
 
-      // --- Gestion de la sélection d'option ---
+      // --- Effet pour calculer le score quand on change d'étape ou de réponses ---
+      useEffect(() => {
+        if (quizStep === 'userInfo' || quizStep === 'results') {
+            const finalScore = answers.reduce((sum, answerIndex, questionIndex) => {
+              if (answerIndex !== null) {
+                const option = questions[questionIndex]?.options[answerIndex];
+                return sum + (option?.score || 0);
+              }
+              return sum;
+            }, 0);
+            setScore(finalScore);
+        }
+      }, [quizStep, answers]);
+
+      // --- Effet pour démarrer l'animation du score à l'étape des résultats ---
+      useEffect(() => {
+        if (quizStep === 'results') {
+          const timer = setTimeout(() => setAnimateScore(true), 300);
+          return () => clearTimeout(timer);
+        } else {
+          setAnimateScore(false);
+        }
+      }, [quizStep]);
+
+      // --- Fonction appelée lors de la sélection d'une option ---
       const handleOptionSelect = (optionIndex) => {
         const newAnswers = [...answers];
         newAnswers[currentQuestionIndex] = optionIndex;
         setAnswers(newAnswers);
       };
 
-      // --- Navigation ---
+      // --- Fonctions de Navigation ---
       const handleNext = () => {
         if (currentQuestionIndex < totalQuestions - 1) {
           setAnimateQuestion(false);
           setTimeout(() => {
             setCurrentQuestionIndex(currentQuestionIndex + 1);
             setAnimateQuestion(true);
-          }, 300); // Délai pour l'effet de transition
+          }, 300); // Délai pour l'effet de transition visuelle
         } else {
-          // Dernière question répondue, passer à l'étape de collecte d'infos
+          // Fin du quiz, passer à l'étape de collecte d'informations
           setQuizStep('userInfo');
         }
       };
 
       const handlePrevious = () => {
+        // Si on est sur l'écran userInfo, revenir au quiz
         if (quizStep === 'userInfo') {
           setQuizStep('quiz');
-          setAnimateQuestion(true); // Réanimer la dernière question vue
-        } else if (currentQuestionIndex > 0) {
+          setAnimateQuestion(true);
+        }
+        // Sinon, si on est dans le quiz et pas à la première question
+        else if (currentQuestionIndex > 0) {
           setAnimateQuestion(false);
           setTimeout(() => {
             setCurrentQuestionIndex(currentQuestionIndex - 1);
@@ -145,297 +140,321 @@
         }
       };
 
-      // --- Gestion & Validation Formulaire User Info ---
-      const handleUserInfoChange = (e) => {
-        const { name, value } = e.target;
-        setUserInfo(prevInfo => ({ ...prevInfo, [name]: value }));
-        // Effacer l'erreur du champ en cours de modification
-        if (userInfoErrors[name]) {
-          setUserInfoErrors(prevErrors => ({ ...prevErrors, [name]: null }));
+      // --- Gestion et Validation du Formulaire d'Informations Utilisateur ---
+       const handleUserInfoChange = (e) => {
+         const { name, value } = e.target;
+         setUserInfo(prevInfo => ({ ...prevInfo, [name]: value }));
+         // Efface l'erreur du champ si l'utilisateur commence à corriger
+         if (userInfoErrors[name]) {
+           setUserInfoErrors(prevErrors => ({ ...prevErrors, [name]: null }));
+         }
+       };
+
+       const validateUserInfo = () => {
+         const errors = {};
+         if (!userInfo.firstName.trim()) errors.firstName = "Le prénom est requis";
+         if (!userInfo.lastName.trim()) errors.lastName = "Le nom est requis";
+         if (!userInfo.email.trim()) {
+           errors.email = "L'adresse e-mail est requise";
+         } else if (!/\S+@\S+\.\S+/.test(userInfo.email)) { // Validation email simple
+           errors.email = "L'adresse e-mail n'est pas valide";
+         }
+         setUserInfoErrors(errors);
+         return Object.keys(errors).length === 0; // Retourne true s'il n'y a pas d'erreurs
+       };
+
+      // --- Fonction pour déterminer le niveau de maturité basé sur le score ---
+      const getMaturityLevel = (currentScore) => {
+        if (maxScore === 0) return { level: "Indéterminé", message: "Le score maximum n'est pas défini." };
+        const pct = (currentScore / maxScore) * 100;
+        // Ajustez ces seuils et messages si nécessaire
+        if (pct < 40) {
+          return { level: "Débutant", message: "Votre approche semble être au début de sa structuration." };
+        } else if (pct < 70) {
+          return { level: "Intermédiaire", message: "Vous avez mis en place des bases solides, potentiel d'optimisation." };
+        } else {
+          return { level: "Avancé", message: "Votre gestion de flotte intègre des pratiques matures." };
         }
       };
 
-      const validateUserInfo = () => {
-        const errors = {};
-        if (!userInfo.firstName.trim()) errors.firstName = "Le prénom est requis";
-        if (!userInfo.lastName.trim()) errors.lastName = "Le nom est requis";
-        if (!userInfo.email.trim()) {
-          errors.email = "L'adresse e-mail est requise";
-        } else if (!/\S+@\S+\.\S+/.test(userInfo.email)) { // Validation regex simple
-          errors.email = "L'adresse e-mail n'est pas valide";
-        }
-        setUserInfoErrors(errors);
-        return Object.keys(errors).length === 0; // True si pas d'erreurs
-      };
-
-      // --- Soumission vers Airtable (Adaptée) ---
+      // --- Fonction de Soumission des données à l'API Logistique ---
       const handleSendToAirtable = async () => {
-        // 1. Valider les informations utilisateur
-        if (!validateUserInfo()) {
-          return; // Arrêter si validation échoue
-        }
+        // 1. Valider les infos utilisateur avant d'envoyer
+        if (!validateUserInfo()) return;
 
-        // 2. Commencer l'envoi
+        // 2. Mettre l'état en mode soumission
         setSubmissionStatus('submitting');
 
-        // 3. Préparer les données (sans score ni niveau)
+        // 3. Calculer les résultats finaux
+        const finalScore = score;
+        const maturityInfo = getMaturityLevel(finalScore);
+        const scorePercentage = maxScore > 0 ? Math.round((finalScore / maxScore) * 100) : 0;
+
+        // 4. Préparer l'objet de données à envoyer
         const dataToSend = {
-          // Infos utilisateur
           Prenom: userInfo.firstName,
           Nom: userInfo.lastName,
           Email: userInfo.email,
+          ScoreTotal: scorePercentage,
+          NiveauMaturite: maturityInfo.level,
         };
-
-        // Ajouter les réponses textuelles avec les bons fieldNames
+        // Ajouter dynamiquement les réponses en utilisant airtableFieldName
         questions.forEach((q, idx) => {
-          const fieldName = q.airtableFieldName; // Utilise le nom défini dans l'objet question
+          const fieldName = q.airtableFieldName; // Le nom du champ à envoyer à l'API
           dataToSend[fieldName] = answers[idx] !== null ? q.options[answers[idx]].text : "Sans réponse";
         });
 
-        // 4. Envoyer les données au backend Vercel
-        // !! IMPORTANT : L'URL '/api/submit-quiz' doit pointer vers votre fonction Vercel à jour !!
+        // 5. Appel Fetch vers l'endpoint spécifique au quiz logistique
         try {
-          const response = await fetch('/api/submit-quiz', {
+          // ================================================================ //
+          // ===> CETTE URL DOIT POINTER VERS VOTRE NOUVEL ENDPOINT API <=== //
+          const response = await fetch('/api/submit-logistics-quiz', { // <-- URL CORRIGÉE ICI
+          // ================================================================ //
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(dataToSend),
           });
 
+          // Gérer les réponses non-OK de l'API
           if (!response.ok) {
-            // Essayer de récupérer plus de détails de l'erreur si possible
             let errorDetail = `Erreur HTTP: ${response.status}`;
-            try {
-                const errorBody = await response.json();
-                errorDetail += ` - ${errorBody.error || JSON.stringify(errorBody)}`;
-            } catch (e) { /* Ignorer si le corps n'est pas JSON */ }
-            throw new Error(errorDetail);
+            try { const errorBody = await response.json(); errorDetail += ` - ${errorBody.error || JSON.stringify(errorBody)}`; } catch (e) {}
+            throw new Error(errorDetail); // Lance une erreur pour aller dans le catch
           }
 
-          console.log('Données envoyées avec succès.');
+          // Si tout s'est bien passé
+          console.log('Données Logistique envoyées avec succès.');
           setSubmissionStatus('success');
-          // Passer à l'étape des résultats après succès
-          setQuizStep('results');
+          setQuizStep('results'); // Afficher l'écran de résultats
 
         } catch (error) {
-          console.error("Erreur lors de l'envoi vers l'API:", error);
+          // Gérer les erreurs (réseau, API, etc.)
+          console.error("Erreur lors de l'envoi vers /api/submit-logistics-quiz:", error);
           setSubmissionStatus('error');
-          // Optionnel : masquer le message d'erreur après qqs secondes
-          setTimeout(() => {
-            if(submissionStatus === 'error') setSubmissionStatus('idle');
-          }, 5000);
+          // Optionnel : réinitialiser l'état d'erreur après un délai
+          setTimeout(() => { if(submissionStatus === 'error') setSubmissionStatus('idle'); }, 5000);
         }
       };
 
-      // --- Recommencer le quiz ---
+      // --- Fonction pour recommencer le quiz ---
       const restart = () => {
         setAnswers(Array(totalQuestions).fill(null));
         setCurrentQuestionIndex(0);
         setSubmissionStatus('idle');
         setUserInfo({ firstName: '', lastName: '', email: '' });
         setUserInfoErrors({});
+        setScore(0);
         setQuizStep('quiz');
         setAnimateQuestion(true);
       };
 
-      // --- Variables pour l'affichage ---
+      // --- Variables pour l'affichage dynamique ---
       const progress = Math.round(
           (quizStep === 'results' ? totalQuestions :
            quizStep === 'userInfo' ? totalQuestions :
            currentQuestionIndex) / totalQuestions * 100
       );
       const currentQuestionData = questions[currentQuestionIndex];
+      // Calculer le niveau seulement si on est à l'étape des résultats
+      const maturity = (quizStep === 'results') ? getMaturityLevel(score) : null;
 
-      // --- Rendu du composant ---
+      // --- Rendu JSX du composant ---
       return (
         <div className="bg-white rounded-xl shadow-xl overflow-hidden mx-auto">
           {/* En-tête */}
           <div className="bg-gradient-to-r from-blue-600 to-indigo-700 p-8 text-center">
-            <h1 className="text-3xl font-bold text-white tracking-tight">Diagnostic Flotte Logistique</h1>
-            <p className="text-indigo-100 mt-2 text-lg">
-              {quizStep === 'quiz' && `${totalQuestions} questions pour comprendre vos enjeux.`}
-              {quizStep === 'userInfo' && `Presque terminé ! Vos coordonnées pour recevoir l'analyse.`}
-              {quizStep === 'results' && `Merci pour votre participation !`}
-            </p>
+             <h1 className="text-3xl font-bold text-white tracking-tight">Diagnostic Flotte Logistique</h1>
+             <p className="text-indigo-100 mt-2 text-lg">
+               {quizStep === 'quiz' && `${totalQuestions} questions pour évaluer votre maturité.`}
+               {quizStep === 'userInfo' && `Presque terminé ! Vos coordonnées pour recevoir l'analyse.`}
+               {quizStep === 'results' && `Voici votre diagnostic personnalisé.`}
+             </p>
           </div>
 
+          {/* Contenu principal (change selon l'étape) */}
           <div className="p-6 md:p-8">
+
             {/* === ÉTAPE QUIZ === */}
             {quizStep === 'quiz' && currentQuestionData && (
-              <div className={animateQuestion ? 'animate-fade-in' : ''}>
-                {/* Progression */}
-                <div className="mb-6">
-                  <div className="flex justify-between text-sm text-gray-600 mb-1">
-                    <span>Question {currentQuestionIndex + 1} sur {totalQuestions}</span>
-                    <span>{progress}%</span>
-                  </div>
-                  <div className="h-2.5 bg-gray-200 rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-blue-600 transition-all duration-500 ease-out"
-                      style={{ width: `${progress}%` }}
-                    />
-                  </div>
-                </div>
+               <div className={animateQuestion ? 'animate-fade-in' : ''}>
+                 {/* Barre de Progression */}
+                 <div className="mb-6">
+                   <div className="flex justify-between text-sm text-gray-600 mb-1">
+                     <span>Question {currentQuestionIndex + 1} sur {totalQuestions}</span>
+                     <span>{progress}%</span>
+                   </div>
+                   <div className="h-2.5 bg-gray-200 rounded-full overflow-hidden">
+                     <div className="h-full bg-blue-600 transition-all duration-500 ease-out" style={{ width: `${progress}%` }} />
+                   </div>
+                 </div>
 
-                {/* Question et Options */}
-                <div>
-                  <h2 className="text-xl md:text-2xl font-semibold text-gray-800 mb-2">{currentQuestionData.title}</h2>
-                  <p className="text-gray-700 mb-6 text-lg">{currentQuestionData.question}</p>
-                  <div className="space-y-3 mb-8">
-                    {currentQuestionData.options.map((opt, i) => (
-                      <div
-                        key={i}
-                        onClick={() => handleOptionSelect(i)}
-                        className={`p-4 border rounded-lg flex items-center cursor-pointer transition-all duration-150 ${
-                          answers[currentQuestionIndex] === i
-                            ? 'border-blue-500 bg-blue-50 ring-2 ring-blue-200'
-                            : 'border-gray-300 hover:bg-gray-50 hover:border-gray-400'
-                        }`}
-                      >
-                        <div className={`w-5 h-5 mr-4 rounded-full flex items-center justify-center border-2 ${
-                          answers[currentQuestionIndex] === i ? 'border-blue-600 bg-blue-600' : 'border-gray-400'
-                        }`}>
-                          {answers[currentQuestionIndex] === i && <svg className="w-3 h-3 text-white fill-current" viewBox="0 0 20 20"><path d="M0 11l2-2 5 5L18 3l2 2L7 18z"/></svg>}
-                        </div>
-                        <span className={`text-base ${answers[currentQuestionIndex] === i ? 'text-blue-800 font-medium' : 'text-gray-700'}`}>{opt.text}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
+                 {/* Affichage Question et Options */}
+                 <div>
+                    <h2 className="text-xl md:text-2xl font-semibold text-gray-800 mb-2">{currentQuestionData.title}</h2>
+                    <p className="text-gray-700 mb-6 text-lg">{currentQuestionData.question}</p>
+                    {/* Liste des options */}
+                    <div className="space-y-3 mb-8">
+                      {currentQuestionData.options.map((opt, i) => (
+                        <div key={i} onClick={() => handleOptionSelect(i)}
+                          className={`p-4 border rounded-lg flex items-center cursor-pointer transition-all duration-150 ${ answers[currentQuestionIndex] === i ? 'border-blue-500 bg-blue-50 ring-2 ring-blue-200' : 'border-gray-300 hover:bg-gray-50 hover:border-gray-400' }`} >
+                           {/* Indicateur de sélection */}
+                           <div className={`w-5 h-5 mr-4 rounded-full flex items-center justify-center border-2 ${ answers[currentQuestionIndex] === i ? 'border-blue-600 bg-blue-600' : 'border-gray-400' }`}>
+                              {answers[currentQuestionIndex] === i && <svg className="w-3 h-3 text-white fill-current" viewBox="0 0 20 20"><path d="M0 11l2-2 5 5L18 3l2 2L7 18z"/></svg>}
+                           </div>
+                           {/* Texte de l'option */}
+                           <span className={`text-base ${answers[currentQuestionIndex] === i ? 'text-blue-800 font-medium' : 'text-gray-700'}`}>{opt.text}</span>
+                         </div>
+                       ))}
+                    </div>
+                 </div>
 
-                {/* Navigation Quiz */}
-                <div className="flex justify-between items-center mt-8 border-t pt-6">
-                  <button
-                    onClick={handlePrevious}
-                    disabled={currentQuestionIndex === 0}
-                    className={`flex items-center px-4 py-2 rounded transition-colors text-base font-medium ${
-                      currentQuestionIndex === 0 ? 'text-gray-400' : 'text-blue-600 hover:bg-blue-50'
-                    }`}
-                  >
-                    <svg className="w-5 h-5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7"></path></svg>
-                    Précédent
-                  </button>
-                  <button
-                    onClick={handleNext}
-                    disabled={answers[currentQuestionIndex] === null}
-                    className={`flex items-center px-6 py-2.5 rounded-lg text-base font-semibold transition-colors ${
-                      answers[currentQuestionIndex] === null ? 'bg-gray-300 text-gray-500' : 'bg-blue-600 text-white hover:bg-blue-700 shadow-md hover:shadow-lg'
-                    }`}
-                  >
-                    {currentQuestionIndex === totalQuestions - 1 ? 'Valider mes réponses' : 'Suivant'}
-                    {currentQuestionIndex !== totalQuestions - 1 && <svg className="w-5 h-5 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7"></path></svg>}
-                  </button>
-                </div>
-              </div>
-            )}
+                 {/* Boutons de Navigation du Quiz */}
+                 <div className="flex justify-between items-center mt-8 border-t pt-6">
+                   <button onClick={handlePrevious} disabled={currentQuestionIndex === 0}
+                     className={`flex items-center px-4 py-2 rounded transition-colors text-base font-medium ${ currentQuestionIndex === 0 ? 'text-gray-400' : 'text-blue-600 hover:bg-blue-50' }`} >
+                     <svg className="w-5 h-5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7"></path></svg>
+                     Précédent
+                   </button>
+                   <button onClick={handleNext} disabled={answers[currentQuestionIndex] === null}
+                     className={`flex items-center px-6 py-2.5 rounded-lg text-base font-semibold transition-colors ${ answers[currentQuestionIndex] === null ? 'bg-gray-300 text-gray-500' : 'bg-blue-600 text-white hover:bg-blue-700 shadow-md hover:shadow-lg' }`} >
+                     {/* Texte du bouton change à la dernière question */}
+                     {currentQuestionIndex === totalQuestions - 1 ? 'Valider & Voir Infos' : 'Suivant'}
+                     {/* Icone flèche seulement si ce n'est pas la dernière question */}
+                     {currentQuestionIndex !== totalQuestions - 1 && <svg className="w-5 h-5 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7"></path></svg>}
+                   </button>
+                 </div>
+               </div>
+            )} {/* Fin étape Quiz */}
 
             {/* === ÉTAPE INFORMATIONS UTILISATEUR === */}
             {quizStep === 'userInfo' && (
-              <div className="animate-fade-in">
-                <h2 className="text-xl md:text-2xl font-semibold text-gray-800 mb-6 text-center">Vos informations pour l'envoi des résultats</h2>
-                <div className="space-y-5 mb-8 max-w-md mx-auto">
-                  <div>
-                    <label htmlFor="firstName" className="block text-sm font-medium text-gray-700 mb-1">Prénom *</label>
-                    <input
-                      type="text" id="firstName" name="firstName"
-                      value={userInfo.firstName} onChange={handleUserInfoChange}
-                      className={`w-full px-4 py-2 border rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-base ${userInfoErrors.firstName ? 'border-red-500' : 'border-gray-300'}`}
-                      placeholder="Ex: Jean"
-                    />
-                    {userInfoErrors.firstName && <p className="text-red-600 text-xs mt-1">{userInfoErrors.firstName}</p>}
-                  </div>
-                  <div>
-                    <label htmlFor="lastName" className="block text-sm font-medium text-gray-700 mb-1">Nom *</label>
-                    <input
-                      type="text" id="lastName" name="lastName"
-                      value={userInfo.lastName} onChange={handleUserInfoChange}
-                      className={`w-full px-4 py-2 border rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-base ${userInfoErrors.lastName ? 'border-red-500' : 'border-gray-300'}`}
-                      placeholder="Ex: Dupont"
-                    />
-                    {userInfoErrors.lastName && <p className="text-red-600 text-xs mt-1">{userInfoErrors.lastName}</p>}
-                  </div>
-                  <div>
-                    <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">Adresse e-mail professionnelle *</label>
-                    <input
-                      type="email" id="email" name="email"
-                      value={userInfo.email} onChange={handleUserInfoChange}
-                      className={`w-full px-4 py-2 border rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-base ${userInfoErrors.email ? 'border-red-500' : 'border-gray-300'}`}
-                      placeholder="Ex: jean.dupont@entreprise.com"
-                    />
-                    {userInfoErrors.email && <p className="text-red-600 text-xs mt-1">{userInfoErrors.email}</p>}
-                  </div>
-                </div>
+               <div className="animate-fade-in">
+                 <h2 className="text-xl md:text-2xl font-semibold text-gray-800 mb-6 text-center">Vos informations pour l'envoi des résultats</h2>
+                 {/* Formulaire */}
+                 <div className="space-y-5 mb-8 max-w-md mx-auto">
+                    {/* Champ Prénom */}
+                    <div>
+                        <label htmlFor="firstName" className="block text-sm font-medium text-gray-700 mb-1">Prénom *</label>
+                        <input type="text" id="firstName" name="firstName" value={userInfo.firstName} onChange={handleUserInfoChange} className={`w-full px-4 py-2 border rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-base ${userInfoErrors.firstName ? 'border-red-500' : 'border-gray-300'}`} placeholder="Ex: Jean" />
+                        {userInfoErrors.firstName && <p className="text-red-600 text-xs mt-1">{userInfoErrors.firstName}</p>}
+                    </div>
+                    {/* Champ Nom */}
+                    <div>
+                        <label htmlFor="lastName" className="block text-sm font-medium text-gray-700 mb-1">Nom *</label>
+                        <input type="text" id="lastName" name="lastName" value={userInfo.lastName} onChange={handleUserInfoChange} className={`w-full px-4 py-2 border rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-base ${userInfoErrors.lastName ? 'border-red-500' : 'border-gray-300'}`} placeholder="Ex: Dupont" />
+                        {userInfoErrors.lastName && <p className="text-red-600 text-xs mt-1">{userInfoErrors.lastName}</p>}
+                    </div>
+                    {/* Champ Email */}
+                    <div>
+                        <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">Adresse e-mail professionnelle *</label>
+                        <input type="email" id="email" name="email" value={userInfo.email} onChange={handleUserInfoChange} className={`w-full px-4 py-2 border rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-base ${userInfoErrors.email ? 'border-red-500' : 'border-gray-300'}`} placeholder="Ex: jean.dupont@entreprise.com" />
+                        {userInfoErrors.email && <p className="text-red-600 text-xs mt-1">{userInfoErrors.email}</p>}
+                    </div>
+                 </div>
 
-                {/* Navigation & Soumission */}
-                <div className="flex flex-col-reverse md:flex-row gap-4 justify-between items-center border-t pt-6 max-w-md mx-auto">
-                  <button onClick={handlePrevious} className="flex items-center justify-center px-4 py-2 rounded text-blue-600 hover:bg-blue-50 transition-colors font-medium md:w-auto w-full">
-                    <svg className="w-5 h-5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7"></path></svg>
-                    Précédent
-                  </button>
-                  <button
-                    onClick={handleSendToAirtable}
-                    className={`px-6 py-3 rounded-lg font-semibold transition-all duration-300 ease-in-out flex items-center justify-center md:w-auto w-full shadow-md hover:shadow-lg ${
-                      submissionStatus === 'submitting' ? 'bg-yellow-500 text-white cursor-wait' :
-                      submissionStatus === 'error' ? 'bg-red-600 text-white hover:bg-red-700' :
-                      'bg-blue-600 text-white hover:bg-blue-700'
-                    }`}
-                    disabled={submissionStatus === 'submitting' || !userInfo.firstName || !userInfo.lastName || !userInfo.email || !!userInfoErrors.email }
-                  >
-                    {submissionStatus === 'submitting' && <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>}
-                    {submissionStatus === 'submitting' ? 'Envoi en cours...' :
-                     submissionStatus === 'error' ? 'Erreur, réessayer ?' :
-                     'Envoyer mes réponses'}
-                  </button>
-                </div>
-                {submissionStatus === 'error' && <p className="text-red-600 text-sm mt-4 text-center max-w-md mx-auto">L'enregistrement a échoué. Veuillez vérifier vos informations ou réessayer. Si le problème persiste, contactez le support.</p>}
-              </div>
-            )}
+                 {/* Boutons de Navigation & Soumission */}
+                 <div className="flex flex-col-reverse md:flex-row gap-4 justify-between items-center border-t pt-6 max-w-md mx-auto">
+                   {/* Bouton Précédent */}
+                   <button onClick={handlePrevious} className="flex items-center justify-center px-4 py-2 rounded text-blue-600 hover:bg-blue-50 transition-colors font-medium md:w-auto w-full">
+                     <svg className="w-5 h-5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7"></path></svg>
+                     Précédent
+                   </button>
+                   {/* Bouton Soumettre */}
+                   <button onClick={handleSendToAirtable}
+                     className={`px-6 py-3 rounded-lg font-semibold transition-all duration-300 ease-in-out flex items-center justify-center md:w-auto w-full shadow-md hover:shadow-lg ${
+                       submissionStatus === 'submitting' ? 'bg-yellow-500 text-white cursor-wait' :
+                       submissionStatus === 'error' ? 'bg-red-600 text-white hover:bg-red-700' :
+                       'bg-blue-600 text-white hover:bg-blue-700' // Style normal/actif
+                     }`}
+                     // Désactiver si envoi en cours ou si champs requis non valides
+                     disabled={submissionStatus === 'submitting' || !userInfo.firstName || !userInfo.lastName || !userInfo.email || !!userInfoErrors.email } >
+                     {/* Indicateur de chargement */}
+                     {submissionStatus === 'submitting' && <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>}
+                     {/* Texte dynamique du bouton */}
+                     {submissionStatus === 'submitting' ? 'Envoi en cours...' :
+                      submissionStatus === 'error' ? 'Erreur, réessayer ?' :
+                      'Envoyer & Voir Résultats'}
+                   </button>
+                 </div>
+                 {/* Message d'erreur si la soumission échoue */}
+                 {submissionStatus === 'error' && <p className="text-red-600 text-sm mt-4 text-center max-w-md mx-auto">L'enregistrement a échoué. Veuillez vérifier vos informations ou réessayer. Si le problème persiste, contactez le support.</p>}
+               </div>
+            )} {/* Fin étape User Info */}
 
-            {/* === ÉTAPE RÉSULTATS (Simplifiée) === */}
+            {/* === ÉTAPE RÉSULTATS === */}
             {quizStep === 'results' && (
-              <div className="text-center animate-fade-in">
-                 <svg className="w-16 h-16 mx-auto text-green-500 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                 <h2 className="text-2xl font-bold text-gray-800 mb-2">Merci, {userInfo.firstName} !</h2>
-                 <p className="text-gray-600 text-lg mb-8">Vos réponses ont bien été enregistrées. Nous reviendrons vers vous prochainement avec une analyse personnalisée.</p>
+               <div className="text-center animate-fade-in">
+                 {/* Affichage du Score (Cercle SVG) */}
+                 <div className="flex justify-center mb-6">
+                    <div className="relative w-40 h-40">
+                       <svg viewBox="0 0 100 100" className="w-full h-full transform -rotate-90">
+                         {/* Cercle de fond */}
+                         <circle cx="50" cy="50" r="45" fill="none" stroke="#EEF2FF" strokeWidth="10"/>
+                         {/* Cercle de progression (animé) */}
+                         <circle cx="50" cy="50" r="45" fill="none" stroke="#2563EB" strokeWidth="10"
+                           strokeDasharray="283" // Circonférence approx (2 * pi * 45)
+                           strokeDashoffset={animateScore && maxScore > 0 ? 283 - (283 * (score / maxScore)) : 283}
+                           className="transition-all duration-1000 ease-out"
+                           strokeLinecap="round"/>
+                       </svg>
+                       {/* Texte du score au centre */}
+                       <div className="absolute inset-0 flex items-center justify-center">
+                           <span className={`text-4xl font-bold text-blue-600 transition-opacity duration-500 ${animateScore ? 'opacity-100' : 'opacity-0'}`}>
+                               {maxScore > 0 ? Math.round((score / maxScore) * 100) : 0}%
+                           </span>
+                       </div>
+                    </div>
+                 </div>
 
-                {/* Récapitulatif des réponses */}
-                <div className="bg-gray-50 border border-gray-200 p-6 rounded-lg mb-8 text-left max-w-lg mx-auto">
-                  <h3 className="font-semibold text-lg text-gray-800 mb-4">Récapitulatif de vos réponses :</h3>
-                  <div className="space-y-4">
-                    {questions.map((q, idx) => (
-                      <div key={q.id}>
-                        <p className="font-medium text-gray-700">{q.title}</p>
-                        <div className="flex items-start mt-1 pl-4">
-                          <span className="mr-2 text-blue-500 font-semibold">›</span>
-                          <span className="text-gray-600">
-                            {answers[idx] !== null ? q.options[answers[idx]].text : <span className="text-gray-400 italic">Sans réponse</span>}
-                          </span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
+                 {/* Affichage Niveau et Message de Maturité */}
+                 {maturity && (
+                    <>
+                      <h2 className="text-2xl md:text-3xl font-bold text-gray-800 mb-2">Niveau : {maturity.level}</h2>
+                      <p className="text-gray-600 text-lg mb-8">{maturity.message}</p>
+                    </>
+                 )}
 
-                {/* Bouton Recommencer */}
-                <div className="flex justify-center mt-8">
-                  <button onClick={restart} className="px-6 py-3 border border-blue-600 text-blue-600 rounded-lg hover:bg-blue-50 font-medium transition-colors duration-150">
-                    Recommencer le Quiz
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
+                 {/* Récapitulatif des réponses */}
+                 <div className="bg-gray-50 border border-gray-200 p-6 rounded-lg mb-8 text-left max-w-lg mx-auto">
+                   <h3 className="font-semibold text-lg text-gray-800 mb-4">Récapitulatif de vos réponses :</h3>
+                   <div className="space-y-4">
+                     {questions.map((q, idx) => (
+                       <div key={q.id}>
+                         <p className="font-medium text-gray-700">{q.title}</p>
+                         <div className="flex items-start mt-1 pl-4">
+                           <span className="mr-2 text-blue-500 font-semibold">›</span>
+                           <span className="text-gray-600">
+                             {answers[idx] !== null ? q.options[answers[idx]].text : <span className="text-gray-400 italic">Sans réponse</span>}
+                           </span>
+                         </div>
+                       </div>
+                     ))}
+                   </div>
+                 </div>
+
+                 {/* Bouton Recommencer */}
+                 <div className="flex justify-center mt-8">
+                   <button onClick={restart} className="px-6 py-3 border border-blue-600 text-blue-600 rounded-lg hover:bg-blue-50 font-medium transition-colors duration-150">
+                     Recommencer le Quiz
+                   </button>
+                 </div>
+                  {/* Confirmation d'enregistrement */}
+                  <p className="text-sm text-gray-500 mt-4">Vos résultats ont été enregistrés.</p>
+               </div>
+            )} {/* Fin étape Résultats */}
+          </div> {/* Fin contenu principal */}
 
           {/* Footer */}
           <div className="text-center text-gray-500 text-xs py-4 border-t border-gray-200 mt-8">
-            © {new Date().getFullYear()} | Votre Entreprise - Quiz Flotte Logistique
+             © {new Date().getFullYear()} | Votre Entreprise - Quiz Flotte Logistique
           </div>
-        </div>
+        </div> /* Fin conteneur global */
       );
-    }
+    } // Fin du composant FleetLogisticsQuiz
 
     // --- Démarrage de l'application React ---
     const root = ReactDOM.createRoot(document.getElementById('root'));
-    root.render(<FleetLogisticsQuiz />); // Nom du composant React racine inchangé ici, mais il utilise le nouveau nom de fonction interne
+    root.render(<FleetLogisticsQuiz />); // Rend le composant du quiz logistique
   </script>
 </body>
 </html>
