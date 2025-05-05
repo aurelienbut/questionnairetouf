@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Quiz RSE Flotte</title>
+
+  <!-- Tailwind CSS via CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- React & ReactDOM (développement) -->
+  <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+
+  <!-- Babel pour transpiler JSX à la volée (uniquement en dev) -->
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+</head>
+<body class="bg-gray-50 flex items-center justify-center min-h-screen p-4">
+  <div id="root" class="w-full max-w-2xl"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect } = React;
+
+    function RSEQuiz() {
+      const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
+      const [answers, setAnswers] = useState(Array(5).fill(null));
+      const [showResults, setShowResults] = useState(false);
+      const [animateQuestion, setAnimateQuestion] = useState(true);
+      const [score, setScore] = useState(0);
+      const [animateScore, setAnimateScore] = useState(false);
+
+      const questions = [
+        {
+          id: 1,
+          title: "Taille de la flotte",
+          question: "Combien de véhicules gérez-vous actuellement dans votre flotte ?",
+          options: [
+            { text: "Moins de 20", score: 1 },
+            { text: "Entre 20 et 100", score: 2 },
+            { text: "Entre 100 et 500", score: 3 },
+            { text: "Plus de 500", score: 4 }
+          ]
+        },
+        {
+          id: 2,
+          title: "Mix énergétique",
+          question: "Quel est aujourd'hui le mix énergétique de votre flotte ?",
+          options: [
+            { text: "100% thermique", score: 1 },
+            { text: "Majoritairement thermique, quelques hybrides/électriques", score: 2 },
+            { text: "Mix équilibré thermique/électrique", score: 3 },
+            { text: "Majoritairement ou 100% électrique", score: 4 }
+          ]
+        },
+        {
+          id: 3,
+          title: "Suivi des émissions CO2",
+          question: "Avez-vous déjà calculé les émissions carbone (CO2) liées à vos véhicules ?",
+          options: [
+            { text: "Non, jamais", score: 1 },
+            { text: "Oui, ponctuellement", score: 2 },
+            { text: "Oui, régulièrement", score: 3 }
+          ]
+        },
+        {
+          id: 4,
+          title: "Politique RSE Flotte",
+          question: "Disposez-vous d'une politique formalisée pour verdir votre flotte automobile ?",
+          options: [
+            { text: "Non, aucune politique définie", score: 1 },
+            { text: "Projet en cours", score: 2 },
+            { text: "Oui, avec objectifs chiffrés", score: 3 }
+          ]
+        },
+        {
+          id: 5,
+          title: "Enjeu prioritaire",
+          question: "Quel est votre principal enjeu aujourd'hui concernant votre flotte ?",
+          options: [
+            { text: "Réduire les coûts (TCO, carburant, maintenance)", score: 1 },
+            { text: "Réduire l'impact environnemental (CO2, ZFE)", score: 3 },
+            { text: "Préparer la conformité réglementaire (LOM, bilan GES)", score: 2 },
+            { text: "Optimiser la gestion opérationnelle (pilotage, digitalisation)", score: 1 }
+          ]
+        }
+      ];
+
+      const totalQuestions = questions.length;
+      const maxScore = 17;
+
+      useEffect(() => {
+        if (showResults) {
+          const timer = setTimeout(() => setAnimateScore(true), 500);
+          return () => clearTimeout(timer);
+        }
+      }, [showResults]);
+
+      const handleOptionSelect = (i) => {
+        const a = [...answers];
+        a[currentQuestionIndex] = i;
+        setAnswers(a);
+      };
+
+      const handleNext = () => {
+        if (currentQuestionIndex < totalQuestions - 1) {
+          setAnimateQuestion(false);
+          setTimeout(() => {
+            setCurrentQuestionIndex(currentQuestionIndex + 1);
+            setAnimateQuestion(true);
+          }, 300);
+        } else {
+          // calcul du score
+          const total = answers.reduce((sum, ans, idx) =>
+            sum + (ans != null ? questions[idx].options[ans].score : 0)
+          , 0);
+          setScore(total);
+          setShowResults(true);
+        }
+      };
+
+      const handlePrevious = () => {
+        if (currentQuestionIndex > 0) {
+          setAnimateQuestion(false);
+          setTimeout(() => {
+            setCurrentQuestionIndex(currentQuestionIndex - 1);
+            setAnimateQuestion(true);
+          }, 300);
+        }
+      };
+
+      const getMaturityLevel = () => {
+        const pct = (score / maxScore) * 100;
+        if (pct < 40) {
+          return {
+            level: "Débutant",
+            message: "Potentiel important d'amélioration sur le plan environnemental."
+          };
+        } else if (pct < 70) {
+          return {
+            level: "Intermédiaire",
+            message: "Votre flotte est en transition écologique."
+          };
+        } else {
+          return {
+            level: "Avancé",
+            message: "Félicitations ! Votre gestion intègre déjà fortement les enjeux environnementaux."
+          };
+        }
+      };
+
+      const progress = Math.round((currentQuestionIndex / totalQuestions) * 100);
+      const current = questions[currentQuestionIndex];
+      const maturity = getMaturityLevel();
+
+      const restart = () => {
+        setAnswers(Array(5).fill(null));
+        setCurrentQuestionIndex(0);
+        setShowResults(false);
+        setAnimateScore(false);
+        setScore(0);
+      };
+
+      return (
+        <div className="bg-white rounded-xl shadow-lg overflow-hidden">
+          {/* En-tête */}
+          <div className="bg-blue-600 p-8 text-center">
+            <h1 className="text-3xl font-bold text-white">Évaluez la maturité RSE de votre flotte</h1>
+            <p className="text-blue-100 mt-2">5 questions pour mesurer votre impact</p>
+          </div>
+
+          <div className="p-8">
+            {!showResults ? (
+              <>
+                {/* Progression */}
+                <div className="mb-6">
+                  <div className="flex justify-between text-sm text-gray-500 mb-1">
+                    <span>Question {currentQuestionIndex+1} sur {totalQuestions}</span>
+                    <span>{progress}%</span>
+                  </div>
+                  <div className="h-2 bg-gray-100 rounded-full">
+                    <div
+                      className="h-full bg-blue-500 transition-all duration-500"
+                      style={{ width: `${progress}%` }}
+                    />
+                  </div>
+                </div>
+
+                {/* Question */}
+                <div className={`transition-opacity duration-300 ${animateQuestion ? 'opacity-100' : 'opacity-0'}`}>
+                  <h2 className="text-xl font-semibold text-blue-600 mb-2">{current.title}</h2>
+                  <p className="text-gray-700 mb-6">{current.question}</p>
+
+                  {/* Options */}
+                  <div className="space-y-3 mb-8">
+                    {current.options.map((opt, i) => (
+                      <div
+                        key={i}
+                        onClick={() => handleOptionSelect(i)}
+                        className={`p-4 border rounded-lg flex items-center cursor-pointer transition-all
+                          ${answers[currentQuestionIndex] === i
+                            ? 'border-blue-500 bg-blue-50 text-blue-700'
+                            : 'border-gray-200 hover:bg-gray-50'}`}
+                      >
+                        <div className={`w-5 h-5 mr-3 rounded-full flex items-center justify-center border
+                          ${answers[currentQuestionIndex] === i ? 'border-blue-500 bg-blue-500' : 'border-gray-300'}`}>
+                          {answers[currentQuestionIndex] === i && <span className="text-white">✓</span>}
+                        </div>
+                        <span>{opt.text}</span>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Navigation */}
+                  <div className="flex justify-between">
+                    <button
+                      onClick={handlePrevious}
+                      disabled={currentQuestionIndex === 0}
+                      className={`flex items-center px-4 py-2 rounded
+                        ${currentQuestionIndex === 0
+                          ? 'text-gray-400 cursor-not-allowed'
+                          : 'text-blue-600 hover:bg-blue-50'}`}
+                    >
+                      ← Précédent
+                    </button>
+                    <button
+                      onClick={handleNext}
+                      disabled={answers[currentQuestionIndex] == null}
+                      className={`flex items-center px-5 py-2 rounded font-medium
+                        ${answers[currentQuestionIndex] == null
+                          ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                          : 'bg-blue-600 text-white hover:bg-blue-700'}`}
+                    >
+                      {currentQuestionIndex === totalQuestions - 1 ? 'Voir les résultats' : 'Suivant'} →
+                    </button>
+                  </div>
+                </div>
+              </>
+            ) : (
+              // Résultats
+              <div className="text-center">
+                <div className="flex justify-center mb-6">
+                  <div className="relative w-40 h-40">
+                    <svg viewBox="0 0 100 100" className="w-full h-full">
+                      <circle cx="50" cy="50" r="45" fill="none" stroke="#EEF2FF" strokeWidth="10"/>
+                      <circle
+                        cx="50" cy="50" r="45" fill="none" stroke="#2563EB" strokeWidth="10"
+                        strokeDasharray="283"
+                        strokeDashoffset={animateScore ? 283 - (283 * (score / maxScore)) : 283}
+                        className="transition-all duration-1500"
+                        transform="rotate(-90 50 50)"
+                      />
+                    </svg>
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <span className="text-3xl font-bold text-blue-600">{Math.round((score/maxScore)*100)}%</span>
+                    </div>
+                  </div>
+                </div>
+
+                <h2 className="text-2xl font-bold text-blue-600 mb-2">Niveau : {maturity.level}</h2>
+                <p className="text-gray-600 mb-8">{maturity.message}</p>
+
+                <div className="bg-blue-50 p-6 rounded-lg mb-8 text-left">
+                  <h3 className="font-semibold text-blue-800 mb-4">Récapitulatif :</h3>
+                  <div className="space-y-4">
+                    {questions.map((q, idx) => (
+                      <div key={q.id}>
+                        <p className="font-medium text-blue-700">{q.title}</p>
+                        <div className="flex items-start mt-1">
+                          <span className="mr-1">›</span>
+                          <span className="text-gray-700">
+                            {answers[idx]!=null ? q.options[answers[idx]].text : "Sans réponse"}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="flex flex-col md:flex-row gap-4 justify-center">
+                  <button
+                    onClick={restart}
+                    className="px-5 py-3 border border-blue-600 text-blue-600 rounded-lg hover:bg-blue-50 font-medium"
+                  >
+                    Recommencer
+                  </button>
+                  <button className="px-5 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium">
+                    Recevoir un diagnostic détaillé
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="text-center text-gray-500 text-sm py-4">
+            © {new Date().getFullYear()} | Évaluez votre impact environnemental
+          </div>
+        </div>
+      );
+    }
+
+    // Démarrage de l'app
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<RSEQuiz />);
+  </script>
+</body>
+</html>
