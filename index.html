@@ -158,46 +158,50 @@
         // 2. Commencer l'envoi si valide
         setSubmissionStatus('submitting');
 
-        // 3. Préparer les données complètes
-        const finalScore = score; // Le score a été calculé par useEffect
-        const maturityInfo = getMaturityLevel(finalScore);
+        // 3. Recalculer le score BRUT (nécessaire pour le % et potentiellement le niveau)
+        const calculatedScoreForSending = answers.reduce((sum, ans, idx) =>
+            sum + (ans != null ? questions[idx].options[ans].score : 0)
+        , 0);
+        console.log('[FRONTEND LOG 2a] Score BRUT recalculé:', calculatedScoreForSending); // Log du score brut
+
+        // 4. --- NOUVEAU : Calculer le pourcentage comme pour l'affichage ---
+        const percentageScore = Math.round((calculatedScoreForSending / maxScore) * 100);
+        console.log('[FRONTEND LOG 2b] Pourcentage calculé pour envoi:', percentageScore); // Log du pourcentage
+
+        // 5. Préparer les données complètes
+        // Utilise toujours le score BRUT pour déterminer le niveau, car la fonction getMaturityLevel est basée dessus
+        const maturityInfo = getMaturityLevel(calculatedScoreForSending);
 
         const dataToSend = {
-           // Infos utilisateur
            Prenom: userInfo.firstName,
            Nom: userInfo.lastName,
            Email: userInfo.email,
-           // Résultats du quiz
-           ScoreTotal: finalScore,
+           // --- MODIFICATION : Envoyer le pourcentage arrondi ---
+           ScoreTotal: percentageScore, // <-- ENVOIE LE POURCENTAGE CALCULÉ
+           // ----------------------------------------------------
            NiveauMaturite: maturityInfo.level,
+           // ... autres champs réponses ...
         };
 
-        questions.forEach((q, idx) => {
-            const fieldName = q.airtableFieldName || q.title.replace(/[^a-zA-Z0-9]/g, '');
-            dataToSend[fieldName] = answers[idx] != null ? q.options[answers[idx]].text : "Sans réponse";
-        });
+         questions.forEach((q, idx) => {
+             const fieldName = q.airtableFieldName || q.title.replace(/[^a-zA-Z0-9]/g, '');
+             dataToSend[fieldName] = answers[idx] != null ? q.options[answers[idx]].text : "Sans réponse";
+         });
 
-        // 4. Envoyer les données
+        // Mettre à jour le log pour refléter l'envoi du pourcentage
+        console.log('[FRONTEND LOG 3] Objet dataToSend (ScoreTotal est le %):', JSON.stringify(dataToSend));
+
+        // 6. Envoyer les données (try/catch/fetch reste inchangé)
         try {
-          const response = await fetch('/api/submit-quiz', { // !! Endpoint Backend !!
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(dataToSend),
-          });
-
+          const response = await fetch('/api/submit-quiz', { /* ... */ });
           if (!response.ok) throw new Error(`Erreur HTTP: ${response.status}`);
-
-          console.log('Données envoyées avec succès.');
+          console.log('Données (avec %) envoyées avec succès.');
           setSubmissionStatus('success');
-          // --- MODIFICATION : Passer à l'étape des résultats APRÈS succès ---
           setQuizStep('results');
-
         } catch (error) {
-          console.error("Erreur lors de l'envoi:", error);
-          setSubmissionStatus('error');
-          setTimeout(() => {
-            if(submissionStatus === 'error') setSubmissionStatus('idle');
-          }, 5000);
+           console.error("[FRONTEND LOG 4] Erreur dans le catch fetch:", error);
+           setSubmissionStatus('error');
+           setTimeout(() => { if(submissionStatus === 'error') setSubmissionStatus('idle'); }, 5000);
         }
       };
 
