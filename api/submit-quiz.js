@@ -57,9 +57,6 @@ export default async function handler(request, response) {
       'Suivi CO2': data.SuiviCO2,
       'Politique RSE': data.PolitiqueRSE,
       'Enjeu Prioritaire': data.EnjeuPrioritaire,
-
-      // --- Métadonnée (optionnel mais utile) ---
-      'Date Soumission': new Date().toISOString(), // Enregistre la date/heure de l'envoi
     };
 
     // 6. Envoyer les données pour créer un enregistrement dans Airtable
