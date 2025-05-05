@@ -1,5 +1,5 @@
 --- Concatenation du projet : C:\Users\aurel\Documents\full of doc\touff questionnaire ---
---- Généré le : 2025-05-05 18:20:04.701778 ---
+--- Généré le : 2025-05-05 18:33:29.971384 ---
 
 --- Fichiers Inclus (3) ---
 - api\submit-quiz.js
@@ -269,8 +269,13 @@ export default async function handler(request, response) {
         setSubmissionStatus('submitting');
 
         // 3. Préparer les données complètes
-        const finalScore = score; // Le score a été calculé par useEffect
+        const finalScore = score; // Le score brut a été calculé par useEffect
         const maturityInfo = getMaturityLevel(finalScore);
+
+        // --- >>> MODIFICATION ICI <<< ---
+        // Calculer le score en pourcentage, comme affiché dans les résultats
+        const scorePercentage = Math.round((finalScore / maxScore) * 100);
+        // --- <<< FIN DE LA MODIFICATION >>> ---
 
         const dataToSend = {
            // Infos utilisateur
@@ -278,16 +283,19 @@ export default async function handler(request, response) {
            Nom: userInfo.lastName,
            Email: userInfo.email,
            // Résultats du quiz
-           ScoreTotal: finalScore,
+           // --- >>> MODIFICATION ICI <<< ---
+           // Envoyer le pourcentage calculé au lieu du score brut
+           ScoreTotal: scorePercentage,
+           // --- <<< FIN DE LA MODIFICATION >>> ---
            NiveauMaturite: maturityInfo.level,
         };
 
         questions.forEach((q, idx) => {
-            const fieldName = q.airtableFieldName || q.title.replace(/[^a-zA-Z0-9]/g, '');
-            dataToSend[fieldName] = answers[idx] != null ? q.options[answers[idx]].text : "Sans réponse";
+           const fieldName = q.airtableFieldName || q.title.replace(/[^a-zA-Z0-9]/g, '');
+           dataToSend[fieldName] = answers[idx] != null ? q.options[answers[idx]].text : "Sans réponse";
         });
 
-        // 4. Envoyer les données
+        // 4. Envoyer les données (le reste de la fonction est inchangé)
         try {
           const response = await fetch('/api/submit-quiz', { // !! Endpoint Backend !!
             method: 'POST',
