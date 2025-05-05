@@ -1,95 +1,462 @@
 --- Concatenation du projet : C:\Users\aurel\Documents\full of doc\touff questionnaire ---
---- Généré le : 2025-05-05 19:59:01.609500 ---
+--- Généré le : 2025-05-05 21:20:19.797154 ---
 
 --- Fichiers Inclus (2) ---
-- api\submit-sales-quiz.js
-- index_sales_quiz.html
+- index.html
+- index_tech_quiz.html
 
 ========================================
 
---- Début du fichier : api\submit-sales-quiz.js ---
-
-// ---> Fichier : api/submit-sales-quiz.js (Nouveau - Pour Quiz Vente/Stratégie) <---
-
-import Airtable from 'airtable';
-
-export default async function handler(request, response) {
-  if (request.method !== 'POST') {
-    response.setHeader('Allow', ['POST']);
-    return response.status(405).json({ error: `Méthode ${request.method} non autorisée` });
-  }
-
-  // Utilise la variable d'environnement pour la table Vente/Stratégie
-  const {
-      AIRTABLE_API_KEY,
-      AIRTABLE_BASE_ID,
-      AIRTABLE_SALES_TABLE_NAME // <= NOUVELLE VARIABLE À CRÉER DANS VERCEL
-  } = process.env;
-
-  if (!AIRTABLE_API_KEY || !AIRTABLE_BASE_ID || !AIRTABLE_SALES_TABLE_NAME) {
-    console.error("Erreur Critique: Variables d'environnement Airtable manquantes pour le quiz Vente ! Vérifiez AIRTABLE_API_KEY, AIRTABLE_BASE_ID, et AIRTABLE_SALES_TABLE_NAME.");
-    return response.status(500).json({ error: "Erreur de configuration du serveur (Vente)." });
-  }
-
-  try {
-    const base = new Airtable({ apiKey: AIRTABLE_API_KEY }).base(AIRTABLE_BASE_ID);
-    const table = base(AIRTABLE_SALES_TABLE_NAME); // Cible la table Vente
-
-    const data = request.body;
-
-    // Validation simple
-    if (!data || typeof data !== 'object' || !data.Email || typeof data.ScoreTotal === 'undefined') {
-        console.warn("Données Vente reçues invalides:", data);
-        return response.status(400).json({ error: "Les données Vente envoyées sont incomplètes ou mal formatées." });
-    }
-
-    // Préparer les champs pour la TABLE VENTE/STRATÉGIE
-    // !! Ces clés doivent correspondre aux colonnes de votre table Vente !!
-    const recordFields = {
-      'Prénom': data.Prenom,
-      'Nom': data.Nom,
-      'Email': data.Email,
-      'Score Total': data.ScoreTotal,
-      'Niveau Maturité': data.NiveauMaturite,
-      // Champs spécifiques au quiz Vente/Stratégie (basés sur airtableFieldName)
-      'Taille Flotte': data.TailleFlotte,
-      'Mix Énergétique': data.MixEnergetique, // Réutilisé
-      'Suivi CO2': data.SuiviCO2,             // Réutilisé
-      'Politique Flotte Verte': data.PolitiqueFlotteVerte, // Nouveau champ (match airtableFieldName)
-      'Enjeu Prioritaire Business': data.EnjeuPrioritaireBusiness, // Nouveau champ (match airtableFieldName)
-    };
-
-    const createdRecords = await table.create([{ fields: recordFields }]);
-
-    console.log(`Enregistrement Airtable créé (Vente) dans ${AIRTABLE_SALES_TABLE_NAME}: ${createdRecords[0].getId()}`);
-    return response.status(201).json({ success: true, message: "Bilan enregistré avec succès." });
-
-  } catch (error) {
-    console.error(`Erreur Airtable (Quiz Vente, Table: ${process.env.AIRTABLE_SALES_TABLE_NAME || 'NON DEFINIE'}) :`, error);
-    let errorMessage = "Erreur interne (Vente).";
-    let statusCode = 500;
-     if (error.statusCode) {
-      statusCode = error.statusCode;
-      errorMessage = `Erreur base de données Vente (${error.statusCode}).`;
-      if (statusCode === 422) {
-        errorMessage = "Données Vente invalides pour la table Airtable (champs/types/options). Vérifiez config.";
-         console.error("Détail erreur 422 Vente:", error.message);
-      }
-    }
-    return response.status(statusCode).json({ error: errorMessage });
-  }
-}
-
---- Fin du fichier : api\submit-sales-quiz.js ---
-
---- Début du fichier : index_sales_quiz.html ---
+--- Début du fichier : index.html ---
 
 <!DOCTYPE html>
 <html lang="fr">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Quiz Stratégie Flotte Automobile</title>
+  <title>Quiz RSE Flotte</title>
+
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+</head>
+<body class="bg-gray-50 flex items-center justify-center min-h-screen p-4">
+  <div id="root" class="w-full max-w-2xl"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect } = React;
+
+    function RSEQuiz() {
+      // --- MODIFICATION : Gestion des étapes ---
+      const [quizStep, setQuizStep] = useState('quiz'); // 'quiz', 'userInfo', 'results'
+      const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
+      const [answers, setAnswers] = useState(Array(5).fill(null));
+      // const [showResults, setShowResults] = useState(false); // Remplacé par quizStep
+      const [animateQuestion, setAnimateQuestion] = useState(true);
+      const [score, setScore] = useState(0);
+      const [animateScore, setAnimateScore] = useState(false);
+      const [submissionStatus, setSubmissionStatus] = useState('idle'); // 'idle', 'submitting', 'success', 'error'
+
+      // --- AJOUT : États pour les informations utilisateur ---
+      const [userInfo, setUserInfo] = useState({
+        firstName: '',
+        lastName: '',
+        email: ''
+      });
+      const [userInfoErrors, setUserInfoErrors] = useState({}); // Pour la validation simple
+
+      const questions = [
+         // ... (votre tableau de questions reste inchangé, avec airtableFieldName)
+          { id: 1, title: "Taille de la flotte", question: "Combien de véhicules gérez-vous actuellement dans votre flotte ?", options: [{ text: "Moins de 20", score: 1 }, { text: "Entre 20 et 100", score: 2 }, { text: "Entre 100 et 500", score: 3 }, { text: "Plus de 500", score: 4 }], airtableFieldName: "TailleFlotte" },
+          { id: 2, title: "Mix énergétique", question: "Quel est aujourd'hui le mix énergétique de votre flotte ?", options: [{ text: "100% thermique", score: 1 }, { text: "Majoritairement thermique, quelques hybrides/électriques", score: 2 }, { text: "Mix équilibré thermique/électrique", score: 3 }, { text: "Majoritairement ou 100% électrique", score: 4 }], airtableFieldName: "MixEnergetique" },
+          { id: 3, title: "Suivi des émissions CO2", question: "Avez-vous déjà calculé les émissions carbone (CO2) liées à vos véhicules ?", options: [{ text: "Non, jamais", score: 1 }, { text: "Oui, ponctuellement", score: 2 }, { text: "Oui, régulièrement", score: 3 }], airtableFieldName: "SuiviCO2" },
+          { id: 4, title: "Politique RSE Flotte", question: "Disposez-vous d'une politique formalisée pour verdir votre flotte automobile ?", options: [{ text: "Non, aucune politique définie", score: 1 }, { text: "Projet en cours", score: 2 }, { text: "Oui, avec objectifs chiffrés", score: 3 }], airtableFieldName: "PolitiqueRSE" },
+          { id: 5, title: "Enjeu prioritaire", question: "Quel est votre principal enjeu aujourd'hui concernant votre flotte ?", options: [{ text: "Réduire les coûts (TCO, carburant, maintenance)", score: 1 }, { text: "Réduire l'impact environnemental (CO2, ZFE)", score: 3 }, { text: "Préparer la conformité réglementaire (LOM, bilan GES)", score: 2 }, { text: "Optimiser la gestion opérationnelle (pilotage, digitalisation)", score: 1 }], airtableFieldName: "EnjeuPrioritaire" }
+      ];
+
+      const totalQuestions = questions.length;
+      const maxScore = 17; // Le score max possible
+
+      // --- MODIFICATION : Calculer le score quand on passe à l'étape userInfo ou results ---
+      useEffect(() => {
+        if (quizStep === 'userInfo' || quizStep === 'results') {
+           const finalScore = answers.reduce((sum, ans, idx) =>
+             sum + (ans != null ? questions[idx].options[ans].score : 0)
+           , 0);
+           setScore(finalScore);
+        }
+      }, [quizStep, answers]); // Recalculer si l'étape change ou si les réponses changent
+
+      // --- MODIFICATION : Animer le score seulement à l'étape results ---
+      useEffect(() => {
+        if (quizStep === 'results') {
+          const timer = setTimeout(() => setAnimateScore(true), 500);
+          return () => clearTimeout(timer);
+        } else {
+           setAnimateScore(false);
+        }
+      }, [quizStep]);
+
+
+      const handleOptionSelect = (i) => {
+        const a = [...answers];
+        a[currentQuestionIndex] = i;
+        setAnswers(a);
+      };
+
+      // --- MODIFICATION : handleNext passe à 'userInfo' après la dernière question ---
+      const handleNext = () => {
+        if (currentQuestionIndex < totalQuestions - 1) {
+          setAnimateQuestion(false);
+          setTimeout(() => {
+            setCurrentQuestionIndex(currentQuestionIndex + 1);
+            setAnimateQuestion(true);
+          }, 300);
+        } else {
+          // Dernière question répondue, passer à l'étape de collecte d'infos
+          setQuizStep('userInfo');
+        }
+      };
+
+      // --- MODIFICATION : handlePrevious gère le retour depuis 'userInfo' ---
+      const handlePrevious = () => {
+        if (quizStep === 'userInfo') {
+           setQuizStep('quiz');
+           setAnimateQuestion(true); // Réanimer la question
+           // Ne pas réinitialiser les erreurs userInfo ici, pour que l'utilisateur les retrouve s'il revient
+        } else if (currentQuestionIndex > 0) {
+          setAnimateQuestion(false);
+          setTimeout(() => {
+            setCurrentQuestionIndex(currentQuestionIndex - 1);
+            setAnimateQuestion(true);
+          }, 300);
+        }
+      };
+
+       // --- AJOUT : Gérer les changements dans le formulaire userInfo ---
+      const handleUserInfoChange = (e) => {
+          const { name, value } = e.target;
+          setUserInfo(prevInfo => ({
+              ...prevInfo,
+              [name]: value
+          }));
+          // Optionnel: effacer l'erreur du champ quand l'utilisateur tape
+          if (userInfoErrors[name]) {
+              setUserInfoErrors(prevErrors => ({
+                  ...prevErrors,
+                  [name]: null
+              }));
+          }
+      };
+
+       // --- AJOUT : Validation simple du formulaire userInfo ---
+       const validateUserInfo = () => {
+           const errors = {};
+           if (!userInfo.firstName.trim()) errors.firstName = "Le prénom est requis";
+           if (!userInfo.lastName.trim()) errors.lastName = "Le nom est requis";
+           if (!userInfo.email.trim()) {
+               errors.email = "L'adresse e-mail est requise";
+           } else if (!/\S+@\S+\.\S+/.test(userInfo.email)) { // Validation email très basique
+               errors.email = "L'adresse e-mail n'est pas valide";
+           }
+           setUserInfoErrors(errors);
+           return Object.keys(errors).length === 0; // True si pas d'erreurs
+       };
+
+
+      const getMaturityLevel = (currentScore) => {
+        // ... (fonction inchangée, prend le score en argument)
+        const pct = (currentScore / maxScore) * 100;
+        if (pct < 40) {
+          return { level: "Débutant", message: "Potentiel important d'amélioration sur le plan environnemental." };
+        } else if (pct < 70) {
+          return { level: "Intermédiaire", message: "Votre flotte est en transition écologique." };
+        } else {
+          return { level: "Avancé", message: "Félicitations ! Votre gestion intègre déjà fortement les enjeux environnementaux." };
+        }
+      };
+
+      // --- MODIFICATION : handleSendToAirtable est appelée depuis l'étape userInfo et inclut ces infos ---
+      const handleSendToAirtable = async () => {
+        // 1. Valider les informations utilisateur d'abord
+        if (!validateUserInfo()) {
+           return; // Arrêter si la validation échoue
+        }
+
+        // 2. Commencer l'envoi si valide
+        setSubmissionStatus('submitting');
+
+        // 3. Préparer les données complètes
+        const finalScore = score; // Le score brut a été calculé par useEffect
+        const maturityInfo = getMaturityLevel(finalScore);
+
+        // --- >>> MODIFICATION ICI <<< ---
+        // Calculer le score en pourcentage, comme affiché dans les résultats
+        const scorePercentage = Math.round((finalScore / maxScore) * 100);
+        // --- <<< FIN DE LA MODIFICATION >>> ---
+
+        const dataToSend = {
+           // Infos utilisateur
+           Prenom: userInfo.firstName,
+           Nom: userInfo.lastName,
+           Email: userInfo.email,
+           // Résultats du quiz
+           // --- >>> MODIFICATION ICI <<< ---
+           // Envoyer le pourcentage calculé au lieu du score brut
+           ScoreTotal: scorePercentage,
+           // --- <<< FIN DE LA MODIFICATION >>> ---
+           NiveauMaturite: maturityInfo.level,
+        };
+
+        questions.forEach((q, idx) => {
+           const fieldName = q.airtableFieldName || q.title.replace(/[^a-zA-Z0-9]/g, '');
+           dataToSend[fieldName] = answers[idx] != null ? q.options[answers[idx]].text : "Sans réponse";
+        });
+
+        // 4. Envoyer les données (le reste de la fonction est inchangé)
+        try {
+          const response = await fetch('/api/submit-quiz', { // !! Endpoint Backend !!
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(dataToSend),
+          });
+
+          if (!response.ok) throw new Error(`Erreur HTTP: ${response.status}`);
+
+          console.log('Données envoyées avec succès.');
+          setSubmissionStatus('success');
+          // --- MODIFICATION : Passer à l'étape des résultats APRÈS succès ---
+          setQuizStep('results');
+
+        } catch (error) {
+          console.error("Erreur lors de l'envoi:", error);
+          setSubmissionStatus('error');
+          setTimeout(() => {
+            if(submissionStatus === 'error') setSubmissionStatus('idle');
+          }, 5000);
+        }
+      };
+
+      const restart = () => {
+        setAnswers(Array(5).fill(null));
+        setCurrentQuestionIndex(0);
+        // setShowResults(false); // Remplacé
+        setScore(0);
+        setSubmissionStatus('idle');
+        setUserInfo({ firstName: '', lastName: '', email: '' }); // Réinitialiser les infos user
+        setUserInfoErrors({}); // Réinitialiser les erreurs
+        // --- MODIFICATION : Revenir à l'étape du quiz ---
+        setQuizStep('quiz');
+        setAnimateQuestion(true);
+      };
+
+      const progress = Math.round(((quizStep === 'results' ? totalQuestions : quizStep === 'userInfo' ? totalQuestions : currentQuestionIndex) / totalQuestions) * 100);
+      const current = questions[currentQuestionIndex];
+      const maturity = (quizStep === 'results' || quizStep === 'userInfo') ? getMaturityLevel(score) : null; // Calculer pour userInfo ou results
+
+      return (
+        <div className="bg-white rounded-xl shadow-lg overflow-hidden">
+          {/* En-tête */}
+          <div className="bg-blue-600 p-8 text-center">
+            <h1 className="text-3xl font-bold text-white">Évaluez la maturité RSE de votre flotte</h1>
+             {/* --- MODIFICATION : Message sous-titre dynamique --- */}
+            <p className="text-blue-100 mt-2">
+                {quizStep === 'quiz' && `5 questions pour mesurer votre impact`}
+                {quizStep === 'userInfo' && `Presque terminé ! Indiquez vos informations pour voir les résultats.`}
+                {quizStep === 'results' && `Voici votre diagnostic RSE.`}
+            </p>
+          </div>
+
+          <div className="p-8">
+            {/* --- MODIFICATION : Affichage conditionnel basé sur quizStep --- */}
+
+            {/* === ÉTAPE QUIZ === */}
+            {quizStep === 'quiz' && (
+              <>
+                {/* Progression */}
+                <div className="mb-6">
+                  <div className="flex justify-between text-sm text-gray-500 mb-1">
+                    <span>Question {currentQuestionIndex + 1} sur {totalQuestions}</span>
+                    <span>{progress}%</span>
+                  </div>
+                  <div className="h-2 bg-gray-100 rounded-full">
+                    <div className="h-full bg-blue-500 transition-all duration-500" style={{ width: `${progress}%` }} />
+                  </div>
+                </div>
+
+                {/* Question */}
+                <div className={`transition-opacity duration-300 ${animateQuestion ? 'opacity-100' : 'opacity-0'}`}>
+                   {/* ... Contenu de la question et options ... (inchangé) */}
+                   <h2 className="text-xl font-semibold text-blue-600 mb-2">{current.title}</h2>
+                   <p className="text-gray-700 mb-6">{current.question}</p>
+                   <div className="space-y-3 mb-8">
+                     {current.options.map((opt, i) => (
+                       <div key={i} onClick={() => handleOptionSelect(i)} className={`p-4 border rounded-lg flex items-center cursor-pointer transition-all ${answers[currentQuestionIndex] === i ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-gray-200 hover:bg-gray-50'}`}>
+                         <div className={`w-5 h-5 mr-3 rounded-full flex items-center justify-center border ${answers[currentQuestionIndex] === i ? 'border-blue-500 bg-blue-500' : 'border-gray-300'}`}>
+                           {answers[currentQuestionIndex] === i && <svg className="w-3 h-3 text-white fill-current" viewBox="0 0 20 20"><path d="M0 11l2-2 5 5L18 3l2 2L7 18z"/></svg>}
+                         </div>
+                         <span>{opt.text}</span>
+                       </div>
+                     ))}
+                   </div>
+                </div>
+
+                 {/* Navigation Quiz */}
+                 <div className="flex justify-between mt-8">
+                    <button onClick={handlePrevious} disabled={currentQuestionIndex === 0} className={`flex items-center px-4 py-2 rounded transition-colors ${currentQuestionIndex === 0 ? 'text-gray-400 cursor-not-allowed' : 'text-blue-600 hover:bg-blue-50'}`}>
+                      <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7"></path></svg>
+                      Précédent
+                    </button>
+                    <button onClick={handleNext} disabled={answers[currentQuestionIndex] == null} className={`flex items-center px-5 py-2 rounded font-medium transition-colors ${answers[currentQuestionIndex] == null ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-blue-600 text-white hover:bg-blue-700'}`}>
+                      {currentQuestionIndex === totalQuestions - 1 ? 'Terminer & Voir Infos' : 'Suivant'}
+                      {currentQuestionIndex !== totalQuestions - 1 && <svg className="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7"></path></svg>}
+                    </button>
+                 </div>
+              </>
+            )}
+
+            {/* === ÉTAPE INFORMATIONS UTILISATEUR === */}
+            {quizStep === 'userInfo' && (
+               <div className="animate-fade-in"> {/* Animation simple */}
+                   <h2 className="text-xl font-semibold text-blue-600 mb-6 text-center">Vos informations pour accéder aux résultats</h2>
+                   <div className="space-y-4 mb-8">
+                       <div>
+                           <label htmlFor="firstName" className="block text-sm font-medium text-gray-700 mb-1">Prénom</label>
+                           <input
+                               type="text"
+                               id="firstName"
+                               name="firstName"
+                               value={userInfo.firstName}
+                               onChange={handleUserInfoChange}
+                               className={`w-full px-3 py-2 border rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 ${userInfoErrors.firstName ? 'border-red-500' : 'border-gray-300'}`}
+                               placeholder="Votre prénom"
+                           />
+                           {userInfoErrors.firstName && <p className="text-red-500 text-xs mt-1">{userInfoErrors.firstName}</p>}
+                       </div>
+                       <div>
+                           <label htmlFor="lastName" className="block text-sm font-medium text-gray-700 mb-1">Nom</label>
+                           <input
+                               type="text"
+                               id="lastName"
+                               name="lastName"
+                               value={userInfo.lastName}
+                               onChange={handleUserInfoChange}
+                               className={`w-full px-3 py-2 border rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 ${userInfoErrors.lastName ? 'border-red-500' : 'border-gray-300'}`}
+                               placeholder="Votre nom"
+                           />
+                            {userInfoErrors.lastName && <p className="text-red-500 text-xs mt-1">{userInfoErrors.lastName}</p>}
+                       </div>
+                       <div>
+                           <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">Adresse e-mail</label>
+                           <input
+                               type="email"
+                               id="email"
+                               name="email"
+                               value={userInfo.email}
+                               onChange={handleUserInfoChange}
+                               className={`w-full px-3 py-2 border rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 ${userInfoErrors.email ? 'border-red-500' : 'border-gray-300'}`}
+                               placeholder="exemple@entreprise.com"
+                           />
+                           {userInfoErrors.email && <p className="text-red-500 text-xs mt-1">{userInfoErrors.email}</p>}
+                       </div>
+                   </div>
+
+                   {/* Navigation & Soumission */}
+                   <div className="flex flex-col md:flex-row gap-4 justify-between">
+                       <button onClick={handlePrevious} className="flex items-center justify-center px-4 py-2 rounded text-blue-600 hover:bg-blue-50 transition-colors md:w-auto w-full order-2 md:order-1">
+                           <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7"></path></svg>
+                           Précédent
+                       </button>
+                       <button
+                           onClick={handleSendToAirtable}
+                           className={`px-5 py-3 rounded-lg font-medium transition-all duration-300 ease-in-out flex items-center justify-center md:w-auto w-full order-1 md:order-2 ${
+                             submissionStatus === 'submitting' ? 'bg-yellow-500 text-white cursor-wait' :
+                             submissionStatus === 'error' ? 'bg-red-600 text-white hover:bg-red-700' :
+                             ( !userInfo.firstName || !userInfo.lastName || !userInfo.email || userInfoErrors.email ) ? 'bg-gray-300 text-gray-500 cursor-not-allowed' : // Désactivé si champs vides ou email invalide
+                             'bg-blue-600 text-white hover:bg-blue-700' // Actif
+                           }`}
+                           disabled={submissionStatus === 'submitting' || !userInfo.firstName || !userInfo.lastName || !userInfo.email || !!userInfoErrors.email } // Désactivation plus stricte
+                       >
+                           {submissionStatus === 'submitting' && <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>}
+                           {submissionStatus === 'submitting' ? 'Envoi en cours...' :
+                            submissionStatus === 'error' ? 'Erreur, réessayer ?' :
+                            'Voir mes résultats & Envoyer'}
+                       </button>
+                   </div>
+                   {submissionStatus === 'error' && <p className="text-red-500 text-sm mt-3 text-center">L'enregistrement a échoué. Veuillez vérifier vos informations ou réessayer.</p>}
+               </div>
+            )}
+
+            {/* === ÉTAPE RÉSULTATS === */}
+            {quizStep === 'results' && (
+              <div className="text-center animate-fade-in"> {/* Animation */}
+                {/* Affichage Score */}
+                <div className="flex justify-center mb-6">
+                  {/* ... (SVG du score inchangé) ... */}
+                  <div className="relative w-40 h-40">
+                    <svg viewBox="0 0 100 100" className="w-full h-full transform -rotate-90">
+                      <circle cx="50" cy="50" r="45" fill="none" stroke="#EEF2FF" strokeWidth="10"/>
+                      <circle cx="50" cy="50" r="45" fill="none" stroke="#2563EB" strokeWidth="10" strokeDasharray="283" strokeDashoffset={animateScore ? 283 - (283 * (score / maxScore)) : 283} className="transition-all duration-1000 ease-out" strokeLinecap="round"/>
+                    </svg>
+                    <div className="absolute inset-0 flex items-center justify-center">
+                       <span className={`text-3xl font-bold text-blue-600 transition-opacity duration-500 ${animateScore ? 'opacity-100' : 'opacity-0'}`}>{Math.round((score/maxScore)*100)}%</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Niveau et Message */}
+                {maturity && (
+                   <>
+                      <h2 className="text-2xl font-bold text-blue-600 mb-2">Niveau : {maturity.level}</h2>
+                      <p className="text-gray-600 mb-8">{maturity.message}</p>
+                   </>
+                )}
+
+                {/* Récapitulatif */}
+                <div className="bg-blue-50 p-6 rounded-lg mb-8 text-left">
+                   {/* ... (Affichage récapitulatif inchangé) ... */}
+                   <h3 className="font-semibold text-blue-800 mb-4">Récapitulatif des réponses :</h3>
+                   <div className="space-y-4">
+                     {questions.map((q, idx) => (
+                       <div key={q.id}>
+                         <p className="font-medium text-blue-700">{q.title}</p>
+                         <div className="flex items-start mt-1">
+                           <span className="mr-2 text-blue-500">›</span>
+                           <span className="text-gray-700">
+                             {answers[idx]!=null ? q.options[answers[idx]].text : <span className="text-gray-400 italic">Sans réponse</span>}
+                           </span>
+                         </div>
+                       </div>
+                     ))}
+                   </div>
+                </div>
+
+                 {/* Bouton Recommencer */}
+                 <div className="flex justify-center">
+                   <button onClick={restart} className="px-5 py-3 border border-blue-600 text-blue-600 rounded-lg hover:bg-blue-50 font-medium transition-colors">
+                     Recommencer le Quiz
+                   </button>
+                 </div>
+                 <p className="text-sm text-gray-500 mt-4">Vos résultats ont été enregistrés.</p>
+
+              </div>
+            )}
+          </div>
+
+          {/* Footer */}
+          <div className="text-center text-gray-500 text-sm py-4 border-t border-gray-100 mt-8">
+            © {new Date().getFullYear()} | Quiz RSE Flotte
+          </div>
+
+          {/* Style pour l'animation fade-in simple */}
+          <style>{`
+            @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+            .animate-fade-in { animation: fadeIn 0.5s ease-out forwards; }
+          `}</style>
+        </div>
+      );
+    }
+
+    // Démarrage de l'app
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<RSEQuiz />);
+  </script>
+</body>
+</html>
+
+--- Fin du fichier : index.html ---
+
+--- Début du fichier : index_tech_quiz.html ---
+
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Quiz Infrastructure Data Flotte</title>
 
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
@@ -108,8 +475,8 @@ export default async function handler(request, response) {
   <script type="text/babel">
     const { useState, useEffect } = React;
 
-    // --- Renommé pour clarté : Composant du Quiz "Vente/Stratégie" ---
-    function SalesLeadQuiz() {
+    // --- Renommé pour clarté : Composant du Quiz Technique/Data ---
+    function TechInfraQuiz() {
       // --- États ---
       const [quizStep, setQuizStep] = useState('quiz');
       const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
@@ -118,7 +485,7 @@ export default async function handler(request, response) {
       const [score, setScore] = useState(0);
       const [animateScore, setAnimateScore] = useState(false);
 
-      // --- NOUVELLES Questions (Version Vente/Stratégie) ---
+      // --- NOUVELLES Questions (Version Tech/Data) ---
       // !! VALIDEZ / AJUSTEZ LES SCORES !!
       const questions = [
         {
@@ -127,24 +494,24 @@ export default async function handler(request, response) {
           airtableFieldName: "TailleFlotte" // Réutilisé
         },
         {
-          id: 2, title: "Mix énergétique", question: "Quel est aujourd'hui le mix énergétique de votre flotte ?",
-          options: [ { text: "100% thermique", score: 1 }, { text: "Majoritairement thermique, quelques véhicules hybrides/électriques", score: 2 }, { text: "Mix équilibré entre thermique et électrifié", score: 3 }, { text: "Majoritairement ou 100% électrique", score: 4 } ],
-          airtableFieldName: "MixEnergetique" // Réutilisé (similaire RSE original)
+          id: 2, title: "Équipement télématique", question: "Quel pourcentage de vos véhicules dispose d’un boîtier connecté ?",
+          options: [ { text: "0 %", score: 1 }, { text: "< 25 %", score: 2 }, { text: "25-75 %", score: 3 }, { text: "> 75 %", score: 4 } ],
+          airtableFieldName: "EquipementTelematique" // Nouveau
         },
         {
-          id: 3, title: "Suivi des émissions CO2", question: "Avez-vous déjà calculé les émissions carbone (CO2) liées à vos véhicules ?",
-          options: [ { text: "Non, jamais", score: 1 }, { text: "Oui, de manière ponctuelle", score: 2 }, { text: "Oui, avec un suivi régulier", score: 3 } ],
-          airtableFieldName: "SuiviCO2" // Réutilisé (similaire RSE original)
+          id: 3, title: "Intégration SI", question: "Les données flotte sont‑elles déjà intégrées à vos ERP/BI ?",
+          options: [ { text: "Non", score: 1 }, { text: "Partielle", score: 2 }, { text: "Intégration complète", score: 3 } ],
+          airtableFieldName: "IntegrationSI" // Nouveau
         },
         {
-          id: 4, title: "Politique RSE Flotte", question: "Disposez-vous d’une politique formalisée pour verdir votre flotte automobile ?",
-          options: [ { text: "Non, aucune politique définie", score: 1 }, { text: "Projet en cours", score: 2 }, { text: "Oui, politique claire avec des objectifs chiffrés", score: 3 } ],
-          airtableFieldName: "PolitiqueFlotteVerte" // Nouveau nom pour distinguer de l'original si besoin
+          id: 4, title: "Gouvernance & sécurité", question: "Avez‑vous défini une gouvernance data flotte (RGPD, cybersécurité) ?",
+          options: [ { text: "Non", score: 1 }, { text: "Projet", score: 2 }, { text: "Oui, politique claire", score: 3 } ],
+          airtableFieldName: "GouvernanceData" // Nouveau
         },
         {
-          id: 5, title: "Enjeu prioritaire aujourd'hui", question: "Quel est votre principal enjeu aujourd'hui concernant votre flotte ?",
-          options: [ { text: "Réduire les coûts (TCO, carburant, maintenance)", score: 1 }, { text: "Réduire l’impact environnemental (CO2, ZFE)", score: 3 }, { text: "Préparer la conformité réglementaire (LOM, bilan GES)", score: 2 }, { text: "Optimiser la gestion opérationnelle (suivi, pilotage, digitalisation)", score: 1 } ],
-          airtableFieldName: "EnjeuPrioritaireBusiness" // Nouveau nom spécifique
+          id: 5, title: "Enjeu prioritaire Tech", question: "Quel est votre enjeu majeur actuellement ?",
+          options: [ { text: "Fiabiliser la qualité data", score: 1 }, { text: "Renforcer cybersécurité", score: 3 }, { text: "Automatiser workflows (maintenance/FAV)", score: 2 }, { text: "Supporter l’électrification (battery monitoring)", score: 3 } ],
+          airtableFieldName: "EnjeuPrioritaireTech" // Nouveau
         }
       ];
 
@@ -160,13 +527,11 @@ export default async function handler(request, response) {
       const [userInfo, setUserInfo] = useState({ firstName: '', lastName: '', email: '' });
       const [userInfoErrors, setUserInfoErrors] = useState({});
 
-      // --- Logique de Calcul de Score, Animation, Sélection, Navigation, User Info (Identique aux versions précédentes) ---
+      // --- Logique de Calcul de Score, Animation, Sélection, Navigation, User Info (Identique) ---
       useEffect(() => { /* Calcul score */
         if (quizStep === 'userInfo' || quizStep === 'results') {
             const finalScore = answers.reduce((sum, answerIndex, questionIndex) => {
-              if (answerIndex !== null) {
-                const option = questions[questionIndex]?.options[answerIndex];
-                return sum + (option?.score || 0); }
+              if (answerIndex !== null) { const option = questions[questionIndex]?.options[answerIndex]; return sum + (option?.score || 0); }
               return sum; }, 0);
             setScore(finalScore); }
       }, [quizStep, answers]);
@@ -194,16 +559,17 @@ export default async function handler(request, response) {
       const validateUserInfo = () => { /* Validation User Info */
         const errors = {}; if (!userInfo.firstName.trim()) errors.firstName = "Le prénom est requis"; if (!userInfo.lastName.trim()) errors.lastName = "Le nom est requis"; if (!userInfo.email.trim()) { errors.email = "L'adresse e-mail est requise"; } else if (!/\S+@\S+\.\S+/.test(userInfo.email)) { errors.email = "L'adresse e-mail n'est pas valide"; } setUserInfoErrors(errors); return Object.keys(errors).length === 0; };
 
-      // --- Fonction Niveau Maturité (Identique) ---
-       const getMaturityLevel = (currentScore) => { /* Détermination Niveau */
+      // --- Fonction Niveau Maturité (Niveaux/Messages Adaptés au Contexte Tech) ---
+       const getMaturityLevel = (currentScore) => {
         if (maxScore === 0) return { level: "Indéterminé", message: "Le score maximum n'est pas défini." };
         const pct = (currentScore / maxScore) * 100;
-        if (pct < 40) { return { level: "Potentiel", message: "Des opportunités existent pour optimiser votre stratégie flotte." }; } // Message adapté
-        else if (pct < 70) { return { level: "Structuré", message: "Votre approche est structurée, affinons ensemble les prochaines étapes." }; } // Message adapté
-        else { return { level: "Mature", message: "Votre stratégie flotte est mature. Explorons les optimisations avancées." }; } // Message adapté
+        // Nouveaux niveaux/messages pour le contexte technique
+        if (pct < 40) { return { level: "Fondations", message: "Votre infrastructure data semble en phase initiale. Explorons les bases." }; }
+        else if (pct < 70) { return { level: "Connectée", message: "Votre flotte est connectée, mais l'intégration peut être optimisée." }; }
+        else { return { level: "Intégrée", message: "Votre infrastructure data est avancée. Discutons d'optimisations et de valeur ajoutée." }; }
       };
 
-      // --- Fonction de Soumission vers l'API Vente/Stratégie ---
+      // --- Fonction de Soumission vers l'API Technique ---
       const handleSendToAirtable = async () => {
         if (!validateUserInfo()) return;
         setSubmissionStatus('submitting');
@@ -212,22 +578,22 @@ export default async function handler(request, response) {
         const maturityInfo = getMaturityLevel(finalScore);
         const scorePercentage = maxScore > 0 ? Math.round((finalScore / maxScore) * 100) : 0;
 
-        // Préparer les données spécifiques à ce quiz
+        // Préparer les données spécifiques à ce quiz technique
         const dataToSend = {
           Prenom: userInfo.firstName, Nom: userInfo.lastName, Email: userInfo.email,
-          ScoreTotal: scorePercentage, NiveauMaturite: maturityInfo.level,
+          ScoreTotal: scorePercentage, NiveauMaturite: maturityInfo.level, // Niveau adapté
         };
         questions.forEach((q, idx) => {
           const fieldName = q.airtableFieldName; // Utilise les nouveaux airtableFieldName
           dataToSend[fieldName] = answers[idx] !== null ? q.options[answers[idx]].text : "Sans réponse";
         });
 
-        // Appel Fetch vers le NOUVEL endpoint API pour ce quiz
+        // Appel Fetch vers le NOUVEL endpoint API pour ce quiz technique
         try {
-          // ================================================================ //
-          // ===> CETTE URL DOIT POINTER VERS VOTRE TROISIÈME ENDPOINT API <=== //
-          const response = await fetch('/api/submit-sales-quiz', { // <-- URL POUR CE QUIZ
-          // ================================================================ //
+          // ================================================================= //
+          // ===> CETTE URL DOIT POINTER VERS VOTRE QUATRIÈME ENDPOINT API <=== //
+          const response = await fetch('/api/submit-tech-quiz', { // <-- URL POUR CE QUIZ
+          // ================================================================= //
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(dataToSend),
@@ -236,10 +602,10 @@ export default async function handler(request, response) {
           if (!response.ok) { /* Gestion erreur réponse API */
             let errorDetail = `Erreur HTTP: ${response.status}`; try { const errorBody = await response.json(); errorDetail += ` - ${errorBody.error || JSON.stringify(errorBody)}`; } catch (e) {} throw new Error(errorDetail); }
 
-          console.log('Données Vente/Stratégie envoyées avec succès.');
+          console.log('Données Techniques envoyées avec succès.');
           setSubmissionStatus('success'); setQuizStep('results');
         } catch (error) { /* Gestion erreur fetch/API */
-          console.error("Erreur lors de l'envoi vers /api/submit-sales-quiz:", error);
+          console.error("Erreur lors de l'envoi vers /api/submit-tech-quiz:", error);
           setSubmissionStatus('error'); setTimeout(() => { if(submissionStatus === 'error') setSubmissionStatus('idle'); }, 5000);
         }
       };
@@ -253,18 +619,18 @@ export default async function handler(request, response) {
       // --- Variables pour le rendu ---
       const progress = Math.round( (quizStep === 'results' ? totalQuestions : quizStep === 'userInfo' ? totalQuestions : currentQuestionIndex) / totalQuestions * 100 );
       const currentQuestionData = questions[currentQuestionIndex];
-      const maturity = (quizStep === 'results') ? getMaturityLevel(score) : null;
+      const maturity = (quizStep === 'results') ? getMaturityLevel(score) : null; // Utilise la fonction adaptée
 
       // --- Rendu JSX (Structure identique, textes et données mis à jour) ---
       return (
         <div className="bg-white rounded-xl shadow-xl overflow-hidden mx-auto">
            {/* En-tête adapté */}
-           <div className="bg-gradient-to-r from-purple-600 to-indigo-700 p-8 text-center"> {/* Couleur différente? */}
-             <h1 className="text-3xl font-bold text-white tracking-tight">Évaluez Votre Stratégie Flotte</h1>
-             <p className="text-indigo-100 mt-2 text-lg">
-               {quizStep === 'quiz' && `5 questions pour identifier vos priorités.`}
-               {quizStep === 'userInfo' && `Indiquez vos coordonnées pour recevoir votre bilan.`}
-               {quizStep === 'results' && `Votre bilan personnalisé.`}
+           <div className="bg-gradient-to-r from-teal-600 to-cyan-700 p-8 text-center"> {/* Couleur différente? */}
+             <h1 className="text-3xl font-bold text-white tracking-tight">Diagnostic Infrastructure Data Flotte</h1>
+             <p className="text-cyan-100 mt-2 text-lg">
+               {quizStep === 'quiz' && `5 questions pour évaluer votre maturité technique.`}
+               {quizStep === 'userInfo' && `Indiquez vos coordonnées pour recevoir votre diagnostic.`}
+               {quizStep === 'results' && `Votre diagnostic technique.`}
              </p>
           </div>
 
@@ -272,70 +638,52 @@ export default async function handler(request, response) {
           <div className="p-6 md:p-8">
              {/* === ÉTAPE QUIZ === */}
              {quizStep === 'quiz' && currentQuestionData && ( <div className={animateQuestion ? 'animate-fade-in' : ''}> {/* ... Progression ... */} {/* ... Question ... */} {/* ... Options ... */} {/* ... Navigation ... */}
-                {/* Copier la structure de l'étape quiz des versions précédentes ici */}
-                 {/* Progression */}
-                 <div className="mb-6">
-                   <div className="flex justify-between text-sm text-gray-600 mb-1">
-                     <span>Question {currentQuestionIndex + 1} sur {totalQuestions}</span>
-                     <span>{progress}%</span>
-                   </div>
-                   <div className="h-2.5 bg-gray-200 rounded-full overflow-hidden"> <div className="h-full bg-purple-600 transition-all duration-500 ease-out" style={{ width: `${progress}%` }} /> {/* Couleur adaptée? */} </div>
-                 </div>
-                 {/* Question et Options */}
-                 <div>
-                    <h2 className="text-xl md:text-2xl font-semibold text-gray-800 mb-2">{currentQuestionData.title}</h2>
-                    <p className="text-gray-700 mb-6 text-lg">{currentQuestionData.question}</p>
-                    <div className="space-y-3 mb-8">
-                      {currentQuestionData.options.map((opt, i) => ( <div key={i} onClick={() => handleOptionSelect(i)} className={`p-4 border rounded-lg flex items-center cursor-pointer transition-all duration-150 ${ answers[currentQuestionIndex] === i ? 'border-purple-500 bg-purple-50 ring-2 ring-purple-200' : 'border-gray-300 hover:bg-gray-50 hover:border-gray-400' }`} > {/* Couleur adaptée? */} <div className={`w-5 h-5 mr-4 rounded-full flex items-center justify-center border-2 ${ answers[currentQuestionIndex] === i ? 'border-purple-600 bg-purple-600' : 'border-gray-400' }`}> {answers[currentQuestionIndex] === i && <svg className="w-3 h-3 text-white fill-current" viewBox="0 0 20 20"><path d="M0 11l2-2 5 5L18 3l2 2L7 18z"/></svg>} </div> <span className={`text-base ${answers[currentQuestionIndex] === i ? 'text-purple-800 font-medium' : 'text-gray-700'}`}>{opt.text}</span> </div> ))}
-                    </div>
-                 </div>
-                 {/* Navigation Quiz */}
-                 <div className="flex justify-between items-center mt-8 border-t pt-6">
-                   <button onClick={handlePrevious} disabled={currentQuestionIndex === 0} className={`flex items-center px-4 py-2 rounded transition-colors text-base font-medium ${ currentQuestionIndex === 0 ? 'text-gray-400' : 'text-purple-600 hover:bg-purple-50' }`} > <svg className="w-5 h-5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7"></path></svg> Précédent </button>
-                   <button onClick={handleNext} disabled={answers[currentQuestionIndex] === null} className={`flex items-center px-6 py-2.5 rounded-lg text-base font-semibold transition-colors ${ answers[currentQuestionIndex] === null ? 'bg-gray-300 text-gray-500' : 'bg-purple-600 text-white hover:bg-purple-700 shadow-md hover:shadow-lg' }`} > {currentQuestionIndex === totalQuestions - 1 ? 'Valider & Voir Infos' : 'Suivant'} {currentQuestionIndex !== totalQuestions - 1 && <svg className="w-5 h-5 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7"></path></svg>} </button>
-                 </div>
+                 {/* Copier la structure de l'étape quiz des versions précédentes ici */}
+                 <div className="mb-6"> <div className="flex justify-between text-sm text-gray-600 mb-1"> <span>Question {currentQuestionIndex + 1} sur {totalQuestions}</span> <span>{progress}%</span> </div> <div className="h-2.5 bg-gray-200 rounded-full overflow-hidden"> <div className="h-full bg-teal-500 transition-all duration-500 ease-out" style={{ width: `${progress}%` }} /> {/* Couleur adaptée? */} </div> </div>
+                 <div> <h2 className="text-xl md:text-2xl font-semibold text-gray-800 mb-2">{currentQuestionData.title}</h2> <p className="text-gray-700 mb-6 text-lg">{currentQuestionData.question}</p> <div className="space-y-3 mb-8"> {currentQuestionData.options.map((opt, i) => ( <div key={i} onClick={() => handleOptionSelect(i)} className={`p-4 border rounded-lg flex items-center cursor-pointer transition-all duration-150 ${ answers[currentQuestionIndex] === i ? 'border-teal-500 bg-teal-50 ring-2 ring-teal-200' : 'border-gray-300 hover:bg-gray-50 hover:border-gray-400' }`} > {/* Couleur adaptée? */} <div className={`w-5 h-5 mr-4 rounded-full flex items-center justify-center border-2 ${ answers[currentQuestionIndex] === i ? 'border-teal-600 bg-teal-600' : 'border-gray-400' }`}> {answers[currentQuestionIndex] === i && <svg className="w-3 h-3 text-white fill-current" viewBox="0 0 20 20"><path d="M0 11l2-2 5 5L18 3l2 2L7 18z"/></svg>} </div> <span className={`text-base ${answers[currentQuestionIndex] === i ? 'text-teal-800 font-medium' : 'text-gray-700'}`}>{opt.text}</span> </div> ))} </div> </div>
+                 <div className="flex justify-between items-center mt-8 border-t pt-6"> <button onClick={handlePrevious} disabled={currentQuestionIndex === 0} className={`flex items-center px-4 py-2 rounded transition-colors text-base font-medium ${ currentQuestionIndex === 0 ? 'text-gray-400' : 'text-teal-600 hover:bg-teal-50' }`} > <svg className="w-5 h-5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7"></path></svg> Précédent </button> <button onClick={handleNext} disabled={answers[currentQuestionIndex] === null} className={`flex items-center px-6 py-2.5 rounded-lg text-base font-semibold transition-colors ${ answers[currentQuestionIndex] === null ? 'bg-gray-300 text-gray-500' : 'bg-teal-600 text-white hover:bg-teal-700 shadow-md hover:shadow-lg' }`} > {currentQuestionIndex === totalQuestions - 1 ? 'Valider & Voir Infos' : 'Suivant'} {currentQuestionIndex !== totalQuestions - 1 && <svg className="w-5 h-5 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7"></path></svg>} </button> </div>
              </div> )}
 
              {/* === ÉTAPE INFORMATIONS UTILISATEUR === */}
              {quizStep === 'userInfo' && ( <div className="animate-fade-in"> {/* ... Titre ... */} {/* ... Formulaire (Prénom, Nom, Email) ... */} {/* ... Navigation & Soumission ... */} {/* ... Message d'erreur ... */}
                  {/* Copier la structure de l'étape user info des versions précédentes ici */}
-                 <h2 className="text-xl md:text-2xl font-semibold text-gray-800 mb-6 text-center">Vos informations pour recevoir votre bilan</h2>
-                 <div className="space-y-5 mb-8 max-w-md mx-auto">
-                    <div> <label htmlFor="firstName" className="block text-sm font-medium text-gray-700 mb-1">Prénom *</label> <input type="text" id="firstName" name="firstName" value={userInfo.firstName} onChange={handleUserInfoChange} className={`w-full px-4 py-2 border rounded-md shadow-sm focus:ring-purple-500 focus:border-purple-500 text-base ${userInfoErrors.firstName ? 'border-red-500' : 'border-gray-300'}`} placeholder="Ex: Jean" /> {userInfoErrors.firstName && <p className="text-red-600 text-xs mt-1">{userInfoErrors.firstName}</p>} </div>
-                    <div> <label htmlFor="lastName" className="block text-sm font-medium text-gray-700 mb-1">Nom *</label> <input type="text" id="lastName" name="lastName" value={userInfo.lastName} onChange={handleUserInfoChange} className={`w-full px-4 py-2 border rounded-md shadow-sm focus:ring-purple-500 focus:border-purple-500 text-base ${userInfoErrors.lastName ? 'border-red-500' : 'border-gray-300'}`} placeholder="Ex: Dupont" /> {userInfoErrors.lastName && <p className="text-red-600 text-xs mt-1">{userInfoErrors.lastName}</p>} </div>
-                    <div> <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">Adresse e-mail professionnelle *</label> <input type="email" id="email" name="email" value={userInfo.email} onChange={handleUserInfoChange} className={`w-full px-4 py-2 border rounded-md shadow-sm focus:ring-purple-500 focus:border-purple-500 text-base ${userInfoErrors.email ? 'border-red-500' : 'border-gray-300'}`} placeholder="Ex: jean.dupont@entreprise.com" /> {userInfoErrors.email && <p className="text-red-600 text-xs mt-1">{userInfoErrors.email}</p>} </div>
-                 </div>
-                 <div className="flex flex-col-reverse md:flex-row gap-4 justify-between items-center border-t pt-6 max-w-md mx-auto">
-                   <button onClick={handlePrevious} className="flex items-center justify-center px-4 py-2 rounded text-purple-600 hover:bg-purple-50 transition-colors font-medium md:w-auto w-full"> <svg className="w-5 h-5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7"></path></svg> Précédent </button>
-                   <button onClick={handleSendToAirtable} className={`px-6 py-3 rounded-lg font-semibold transition-all duration-300 ease-in-out flex items-center justify-center md:w-auto w-full shadow-md hover:shadow-lg ${ submissionStatus === 'submitting' ? 'bg-yellow-500 text-white cursor-wait' : submissionStatus === 'error' ? 'bg-red-600 text-white hover:bg-red-700' : 'bg-purple-600 text-white hover:bg-purple-700' }`} disabled={submissionStatus === 'submitting' || !userInfo.firstName || !userInfo.lastName || !userInfo.email || !!userInfoErrors.email } > {submissionStatus === 'submitting' && <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>} {submissionStatus === 'submitting' ? 'Envoi en cours...' : submissionStatus === 'error' ? 'Erreur, réessayer ?' : 'Envoyer & Voir Bilan'} </button>
-                 </div>
-                 {submissionStatus === 'error' && <p className="text-red-600 text-sm mt-4 text-center max-w-md mx-auto">L'enregistrement a échoué. Veuillez vérifier vos informations ou réessayer.</p>}
+                  <h2 className="text-xl md:text-2xl font-semibold text-gray-800 mb-6 text-center">Vos informations pour recevoir votre diagnostic</h2>
+                  <div className="space-y-5 mb-8 max-w-md mx-auto">
+                    <div> <label htmlFor="firstName" className="block text-sm font-medium text-gray-700 mb-1">Prénom *</label> <input type="text" id="firstName" name="firstName" value={userInfo.firstName} onChange={handleUserInfoChange} className={`w-full px-4 py-2 border rounded-md shadow-sm focus:ring-teal-500 focus:border-teal-500 text-base ${userInfoErrors.firstName ? 'border-red-500' : 'border-gray-300'}`} placeholder="Ex: Jean" /> {userInfoErrors.firstName && <p className="text-red-600 text-xs mt-1">{userInfoErrors.firstName}</p>} </div>
+                    <div> <label htmlFor="lastName" className="block text-sm font-medium text-gray-700 mb-1">Nom *</label> <input type="text" id="lastName" name="lastName" value={userInfo.lastName} onChange={handleUserInfoChange} className={`w-full px-4 py-2 border rounded-md shadow-sm focus:ring-teal-500 focus:border-teal-500 text-base ${userInfoErrors.lastName ? 'border-red-500' : 'border-gray-300'}`} placeholder="Ex: Dupont" /> {userInfoErrors.lastName && <p className="text-red-600 text-xs mt-1">{userInfoErrors.lastName}</p>} </div>
+                    <div> <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">Adresse e-mail professionnelle *</label> <input type="email" id="email" name="email" value={userInfo.email} onChange={handleUserInfoChange} className={`w-full px-4 py-2 border rounded-md shadow-sm focus:ring-teal-500 focus:border-teal-500 text-base ${userInfoErrors.email ? 'border-red-500' : 'border-gray-300'}`} placeholder="Ex: jean.dupont@entreprise.com" /> {userInfoErrors.email && <p className="text-red-600 text-xs mt-1">{userInfoErrors.email}</p>} </div>
+                  </div>
+                  <div className="flex flex-col-reverse md:flex-row gap-4 justify-between items-center border-t pt-6 max-w-md mx-auto">
+                    <button onClick={handlePrevious} className="flex items-center justify-center px-4 py-2 rounded text-teal-600 hover:bg-teal-50 transition-colors font-medium md:w-auto w-full"> <svg className="w-5 h-5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7"></path></svg> Précédent </button>
+                    <button onClick={handleSendToAirtable} className={`px-6 py-3 rounded-lg font-semibold transition-all duration-300 ease-in-out flex items-center justify-center md:w-auto w-full shadow-md hover:shadow-lg ${ submissionStatus === 'submitting' ? 'bg-yellow-500 text-white cursor-wait' : submissionStatus === 'error' ? 'bg-red-600 text-white hover:bg-red-700' : 'bg-teal-600 text-white hover:bg-teal-700' }`} disabled={submissionStatus === 'submitting' || !userInfo.firstName || !userInfo.lastName || !userInfo.email || !!userInfoErrors.email } > {submissionStatus === 'submitting' && <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>} {submissionStatus === 'submitting' ? 'Envoi en cours...' : submissionStatus === 'error' ? 'Erreur, réessayer ?' : 'Envoyer & Voir Diagnostic'} </button>
+                  </div>
+                  {submissionStatus === 'error' && <p className="text-red-600 text-sm mt-4 text-center max-w-md mx-auto">L'enregistrement a échoué. Veuillez vérifier vos informations ou réessayer.</p>}
              </div> )}
 
              {/* === ÉTAPE RÉSULTATS === */}
              {quizStep === 'results' && ( <div className="text-center animate-fade-in"> {/* ... Affichage Score SVG ... */} {/* ... Niveau et Message Maturité ... */} {/* ... Récapitulatif Réponses ... */} {/* ... Bouton Recommencer ... */}
-                 {/* Copier la structure de l'étape résultats des versions précédentes ici */}
-                  <div className="flex justify-center mb-6"> <div className="relative w-40 h-40"> <svg viewBox="0 0 100 100" className="w-full h-full transform -rotate-90"> <circle cx="50" cy="50" r="45" fill="none" stroke="#F3E8FF" strokeWidth="10"/> {/* Couleur adaptée? */} <circle cx="50" cy="50" r="45" fill="none" stroke="#8B5CF6" strokeWidth="10" strokeDasharray="283" strokeDashoffset={animateScore && maxScore > 0 ? 283 - (283 * (score / maxScore)) : 283} className="transition-all duration-1000 ease-out" strokeLinecap="round"/> {/* Couleur adaptée? */} </svg> <div className="absolute inset-0 flex items-center justify-center"> <span className={`text-4xl font-bold text-purple-600 transition-opacity duration-500 ${animateScore ? 'opacity-100' : 'opacity-0'}`}> {maxScore > 0 ? Math.round((score / maxScore) * 100) : 0}% </span> </div> </div> </div>
-                  {maturity && ( <> <h2 className="text-2xl md:text-3xl font-bold text-gray-800 mb-2">Votre profil : {maturity.level}</h2> <p className="text-gray-600 text-lg mb-8">{maturity.message}</p> </> )}
-                  <div className="bg-gray-50 border border-gray-200 p-6 rounded-lg mb-8 text-left max-w-lg mx-auto"> <h3 className="font-semibold text-lg text-gray-800 mb-4">Récapitulatif de vos réponses :</h3> <div className="space-y-4"> {questions.map((q, idx) => ( <div key={q.id}> <p className="font-medium text-gray-700">{q.title}</p> <div className="flex items-start mt-1 pl-4"> <span className="mr-2 text-purple-500 font-semibold">›</span> <span className="text-gray-600"> {answers[idx] !== null ? q.options[answers[idx]].text : <span className="text-gray-400 italic">Sans réponse</span>} </span> </div> </div> ))} </div> </div>
-                  <div className="flex justify-center mt-8"> <button onClick={restart} className="px-6 py-3 border border-purple-600 text-purple-600 rounded-lg hover:bg-purple-50 font-medium transition-colors duration-150"> Recommencer le Quiz </button> </div>
+                  {/* Copier la structure de l'étape résultats des versions précédentes ici */}
+                  <div className="flex justify-center mb-6"> <div className="relative w-40 h-40"> <svg viewBox="0 0 100 100" className="w-full h-full transform -rotate-90"> <circle cx="50" cy="50" r="45" fill="none" stroke="#CCFBF1" strokeWidth="10"/> {/* Couleur adaptée? */} <circle cx="50" cy="50" r="45" fill="none" stroke="#14B8A6" strokeWidth="10" strokeDasharray="283" strokeDashoffset={animateScore && maxScore > 0 ? 283 - (283 * (score / maxScore)) : 283} className="transition-all duration-1000 ease-out" strokeLinecap="round"/> {/* Couleur adaptée? */} </svg> <div className="absolute inset-0 flex items-center justify-center"> <span className={`text-4xl font-bold text-teal-600 transition-opacity duration-500 ${animateScore ? 'opacity-100' : 'opacity-0'}`}> {maxScore > 0 ? Math.round((score / maxScore) * 100) : 0}% </span> </div> </div> </div>
+                  {maturity && ( <> <h2 className="text-2xl md:text-3xl font-bold text-gray-800 mb-2">Maturité Data : {maturity.level}</h2> <p className="text-gray-600 text-lg mb-8">{maturity.message}</p> </> )}
+                  <div className="bg-gray-50 border border-gray-200 p-6 rounded-lg mb-8 text-left max-w-lg mx-auto"> <h3 className="font-semibold text-lg text-gray-800 mb-4">Récapitulatif de vos réponses :</h3> <div className="space-y-4"> {questions.map((q, idx) => ( <div key={q.id}> <p className="font-medium text-gray-700">{q.title}</p> <div className="flex items-start mt-1 pl-4"> <span className="mr-2 text-teal-500 font-semibold">›</span> <span className="text-gray-600"> {answers[idx] !== null ? q.options[answers[idx]].text : <span className="text-gray-400 italic">Sans réponse</span>} </span> </div> </div> ))} </div> </div>
+                  <div className="flex justify-center mt-8"> <button onClick={restart} className="px-6 py-3 border border-teal-600 text-teal-600 rounded-lg hover:bg-teal-50 font-medium transition-colors duration-150"> Recommencer le Quiz </button> </div>
                   <p className="text-sm text-gray-500 mt-4">Vos réponses ont été enregistrées.</p>
              </div> )}
           </div>
 
           {/* Footer */}
           <div className="text-center text-gray-500 text-xs py-4 border-t border-gray-200 mt-8">
-             © {new Date().getFullYear()} | Votre Entreprise - Diagnostic Flotte
+             © {new Date().getFullYear()} | Votre Entreprise - Diagnostic Data Flotte
           </div>
         </div>
       );
-    } // Fin du composant SalesLeadQuiz
+    } // Fin du composant TechInfraQuiz
 
     // --- Démarrage ---
     const root = ReactDOM.createRoot(document.getElementById('root'));
-    root.render(<SalesLeadQuiz />); // Rend le nouveau composant
+    root.render(<TechInfraQuiz />); // Rend le nouveau composant
   </script>
 </body>
 </html>
 
---- Fin du fichier : index_sales_quiz.html ---
+--- Fin du fichier : index_tech_quiz.html ---

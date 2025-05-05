@@ -11,12 +11,11 @@
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
   <style>
-    @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
     .animate-fade-in { animation: fadeIn 0.5s ease-out forwards; }
-    button:disabled { cursor: not-allowed; opacity: 0.6; }
   </style>
 </head>
-<body class="bg-gray-100 flex items-center justify-center min-h-screen p-4">
+<body class="bg-gray-50 flex items-center justify-center min-h-screen p-4">
   <div id="root" class="w-full max-w-2xl"></div>
 
   <script type="text/babel">
@@ -41,7 +40,7 @@
           airtableFieldName: "TailleFlotte" // Réutilisé
         },
         {
-          id: 2, title: "Équipement télématique", question: "Quel pourcentage de vos véhicules dispose d’un boîtier connecté ?",
+          id: 2, title: "Équipement télématique", question: "Quel pourcentage de vos véhicules dispose d'un boîtier connecté ?",
           options: [ { text: "0 %", score: 1 }, { text: "< 25 %", score: 2 }, { text: "25-75 %", score: 3 }, { text: "> 75 %", score: 4 } ],
           airtableFieldName: "EquipementTelematique" // Nouveau
         },
@@ -57,7 +56,7 @@
         },
         {
           id: 5, title: "Enjeu prioritaire Tech", question: "Quel est votre enjeu majeur actuellement ?",
-          options: [ { text: "Fiabiliser la qualité data", score: 1 }, { text: "Renforcer cybersécurité", score: 3 }, { text: "Automatiser workflows (maintenance/FAV)", score: 2 }, { text: "Supporter l’électrification (battery monitoring)", score: 3 } ],
+          options: [ { text: "Fiabiliser la qualité data", score: 1 }, { text: "Renforcer cybersécurité", score: 3 }, { text: "Automatiser workflows (maintenance/FAV)", score: 2 }, { text: "Supporter l'électrification (battery monitoring)", score: 3 } ],
           airtableFieldName: "EnjeuPrioritaireTech" // Nouveau
         }
       ];
@@ -84,7 +83,7 @@
       }, [quizStep, answers]);
 
       useEffect(() => { /* Animation score */
-        if (quizStep === 'results') { const timer = setTimeout(() => setAnimateScore(true), 300); return () => clearTimeout(timer); }
+        if (quizStep === 'results') { const timer = setTimeout(() => setAnimateScore(true), 500); return () => clearTimeout(timer); }
         else { setAnimateScore(false); }
       }, [quizStep]);
 
@@ -166,62 +165,202 @@
       // --- Variables pour le rendu ---
       const progress = Math.round( (quizStep === 'results' ? totalQuestions : quizStep === 'userInfo' ? totalQuestions : currentQuestionIndex) / totalQuestions * 100 );
       const currentQuestionData = questions[currentQuestionIndex];
-      const maturity = (quizStep === 'results') ? getMaturityLevel(score) : null; // Utilise la fonction adaptée
+      const maturity = (quizStep === 'results' || quizStep === 'userInfo') ? getMaturityLevel(score) : null; // Utilise la fonction adaptée
 
       // --- Rendu JSX (Structure identique, textes et données mis à jour) ---
       return (
-        <div className="bg-white rounded-xl shadow-xl overflow-hidden mx-auto">
+        <div className="bg-white rounded-xl shadow-lg overflow-hidden">
            {/* En-tête adapté */}
-           <div className="bg-gradient-to-r from-teal-600 to-cyan-700 p-8 text-center"> {/* Couleur différente? */}
-             <h1 className="text-3xl font-bold text-white tracking-tight">Diagnostic Infrastructure Data Flotte</h1>
-             <p className="text-cyan-100 mt-2 text-lg">
-               {quizStep === 'quiz' && `5 questions pour évaluer votre maturité technique.`}
-               {quizStep === 'userInfo' && `Indiquez vos coordonnées pour recevoir votre diagnostic.`}
-               {quizStep === 'results' && `Votre diagnostic technique.`}
+           <div className="bg-blue-600 p-8 text-center">
+             <h1 className="text-3xl font-bold text-white">Évaluez la maturité Data de votre flotte</h1>
+             <p className="text-blue-100 mt-2">
+               {quizStep === 'quiz' && `5 questions pour mesurer votre impact`}
+               {quizStep === 'userInfo' && `Presque terminé ! Indiquez vos informations pour voir les résultats.`}
+               {quizStep === 'results' && `Voici votre diagnostic data.`}
              </p>
           </div>
 
           {/* Contenu principal */}
-          <div className="p-6 md:p-8">
+          <div className="p-8">
              {/* === ÉTAPE QUIZ === */}
-             {quizStep === 'quiz' && currentQuestionData && ( <div className={animateQuestion ? 'animate-fade-in' : ''}> {/* ... Progression ... */} {/* ... Question ... */} {/* ... Options ... */} {/* ... Navigation ... */}
-                 {/* Copier la structure de l'étape quiz des versions précédentes ici */}
-                 <div className="mb-6"> <div className="flex justify-between text-sm text-gray-600 mb-1"> <span>Question {currentQuestionIndex + 1} sur {totalQuestions}</span> <span>{progress}%</span> </div> <div className="h-2.5 bg-gray-200 rounded-full overflow-hidden"> <div className="h-full bg-teal-500 transition-all duration-500 ease-out" style={{ width: `${progress}%` }} /> {/* Couleur adaptée? */} </div> </div>
-                 <div> <h2 className="text-xl md:text-2xl font-semibold text-gray-800 mb-2">{currentQuestionData.title}</h2> <p className="text-gray-700 mb-6 text-lg">{currentQuestionData.question}</p> <div className="space-y-3 mb-8"> {currentQuestionData.options.map((opt, i) => ( <div key={i} onClick={() => handleOptionSelect(i)} className={`p-4 border rounded-lg flex items-center cursor-pointer transition-all duration-150 ${ answers[currentQuestionIndex] === i ? 'border-teal-500 bg-teal-50 ring-2 ring-teal-200' : 'border-gray-300 hover:bg-gray-50 hover:border-gray-400' }`} > {/* Couleur adaptée? */} <div className={`w-5 h-5 mr-4 rounded-full flex items-center justify-center border-2 ${ answers[currentQuestionIndex] === i ? 'border-teal-600 bg-teal-600' : 'border-gray-400' }`}> {answers[currentQuestionIndex] === i && <svg className="w-3 h-3 text-white fill-current" viewBox="0 0 20 20"><path d="M0 11l2-2 5 5L18 3l2 2L7 18z"/></svg>} </div> <span className={`text-base ${answers[currentQuestionIndex] === i ? 'text-teal-800 font-medium' : 'text-gray-700'}`}>{opt.text}</span> </div> ))} </div> </div>
-                 <div className="flex justify-between items-center mt-8 border-t pt-6"> <button onClick={handlePrevious} disabled={currentQuestionIndex === 0} className={`flex items-center px-4 py-2 rounded transition-colors text-base font-medium ${ currentQuestionIndex === 0 ? 'text-gray-400' : 'text-teal-600 hover:bg-teal-50' }`} > <svg className="w-5 h-5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7"></path></svg> Précédent </button> <button onClick={handleNext} disabled={answers[currentQuestionIndex] === null} className={`flex items-center px-6 py-2.5 rounded-lg text-base font-semibold transition-colors ${ answers[currentQuestionIndex] === null ? 'bg-gray-300 text-gray-500' : 'bg-teal-600 text-white hover:bg-teal-700 shadow-md hover:shadow-lg' }`} > {currentQuestionIndex === totalQuestions - 1 ? 'Valider & Voir Infos' : 'Suivant'} {currentQuestionIndex !== totalQuestions - 1 && <svg className="w-5 h-5 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7"></path></svg>} </button> </div>
-             </div> )}
+             {quizStep === 'quiz' && (
+               <>
+                 {/* Progression */}
+                 <div className="mb-6">
+                   <div className="flex justify-between text-sm text-gray-500 mb-1">
+                     <span>Question {currentQuestionIndex + 1} sur {totalQuestions}</span>
+                     <span>{progress}%</span>
+                   </div>
+                   <div className="h-2 bg-gray-100 rounded-full">
+                     <div className="h-full bg-blue-500 transition-all duration-500" style={{ width: `${progress}%` }} />
+                   </div>
+                 </div>
+
+                 {/* Question */}
+                 <div className={`transition-opacity duration-300 ${animateQuestion ? 'opacity-100' : 'opacity-0'}`}>
+                   <h2 className="text-xl font-semibold text-blue-600 mb-2">{currentQuestionData.title}</h2>
+                   <p className="text-gray-700 mb-6">{currentQuestionData.question}</p>
+                   <div className="space-y-3 mb-8">
+                     {currentQuestionData.options.map((opt, i) => (
+                       <div key={i} onClick={() => handleOptionSelect(i)} className={`p-4 border rounded-lg flex items-center cursor-pointer transition-all ${answers[currentQuestionIndex] === i ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-gray-200 hover:bg-gray-50'}`}>
+                         <div className={`w-5 h-5 mr-3 rounded-full flex items-center justify-center border ${answers[currentQuestionIndex] === i ? 'border-blue-500 bg-blue-500' : 'border-gray-300'}`}>
+                           {answers[currentQuestionIndex] === i && <svg className="w-3 h-3 text-white fill-current" viewBox="0 0 20 20"><path d="M0 11l2-2 5 5L18 3l2 2L7 18z"/></svg>}
+                         </div>
+                         <span>{opt.text}</span>
+                       </div>
+                     ))}
+                   </div>
+                 </div>
+
+                 {/* Navigation Quiz */}
+                 <div className="flex justify-between mt-8">
+                    <button onClick={handlePrevious} disabled={currentQuestionIndex === 0} className={`flex items-center px-4 py-2 rounded transition-colors ${currentQuestionIndex === 0 ? 'text-gray-400 cursor-not-allowed' : 'text-blue-600 hover:bg-blue-50'}`}>
+                      <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7"></path></svg>
+                      Précédent
+                    </button>
+                    <button onClick={handleNext} disabled={answers[currentQuestionIndex] == null} className={`flex items-center px-5 py-2 rounded font-medium transition-colors ${answers[currentQuestionIndex] == null ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-blue-600 text-white hover:bg-blue-700'}`}>
+                      {currentQuestionIndex === totalQuestions - 1 ? 'Terminer & Voir Infos' : 'Suivant'}
+                      {currentQuestionIndex !== totalQuestions - 1 && <svg className="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7"></path></svg>}
+                    </button>
+                 </div>
+               </>
+             )}
 
              {/* === ÉTAPE INFORMATIONS UTILISATEUR === */}
-             {quizStep === 'userInfo' && ( <div className="animate-fade-in"> {/* ... Titre ... */} {/* ... Formulaire (Prénom, Nom, Email) ... */} {/* ... Navigation & Soumission ... */} {/* ... Message d'erreur ... */}
-                 {/* Copier la structure de l'étape user info des versions précédentes ici */}
-                  <h2 className="text-xl md:text-2xl font-semibold text-gray-800 mb-6 text-center">Vos informations pour recevoir votre diagnostic</h2>
-                  <div className="space-y-5 mb-8 max-w-md mx-auto">
-                    <div> <label htmlFor="firstName" className="block text-sm font-medium text-gray-700 mb-1">Prénom *</label> <input type="text" id="firstName" name="firstName" value={userInfo.firstName} onChange={handleUserInfoChange} className={`w-full px-4 py-2 border rounded-md shadow-sm focus:ring-teal-500 focus:border-teal-500 text-base ${userInfoErrors.firstName ? 'border-red-500' : 'border-gray-300'}`} placeholder="Ex: Jean" /> {userInfoErrors.firstName && <p className="text-red-600 text-xs mt-1">{userInfoErrors.firstName}</p>} </div>
-                    <div> <label htmlFor="lastName" className="block text-sm font-medium text-gray-700 mb-1">Nom *</label> <input type="text" id="lastName" name="lastName" value={userInfo.lastName} onChange={handleUserInfoChange} className={`w-full px-4 py-2 border rounded-md shadow-sm focus:ring-teal-500 focus:border-teal-500 text-base ${userInfoErrors.lastName ? 'border-red-500' : 'border-gray-300'}`} placeholder="Ex: Dupont" /> {userInfoErrors.lastName && <p className="text-red-600 text-xs mt-1">{userInfoErrors.lastName}</p>} </div>
-                    <div> <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">Adresse e-mail professionnelle *</label> <input type="email" id="email" name="email" value={userInfo.email} onChange={handleUserInfoChange} className={`w-full px-4 py-2 border rounded-md shadow-sm focus:ring-teal-500 focus:border-teal-500 text-base ${userInfoErrors.email ? 'border-red-500' : 'border-gray-300'}`} placeholder="Ex: jean.dupont@entreprise.com" /> {userInfoErrors.email && <p className="text-red-600 text-xs mt-1">{userInfoErrors.email}</p>} </div>
-                  </div>
-                  <div className="flex flex-col-reverse md:flex-row gap-4 justify-between items-center border-t pt-6 max-w-md mx-auto">
-                    <button onClick={handlePrevious} className="flex items-center justify-center px-4 py-2 rounded text-teal-600 hover:bg-teal-50 transition-colors font-medium md:w-auto w-full"> <svg className="w-5 h-5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7"></path></svg> Précédent </button>
-                    <button onClick={handleSendToAirtable} className={`px-6 py-3 rounded-lg font-semibold transition-all duration-300 ease-in-out flex items-center justify-center md:w-auto w-full shadow-md hover:shadow-lg ${ submissionStatus === 'submitting' ? 'bg-yellow-500 text-white cursor-wait' : submissionStatus === 'error' ? 'bg-red-600 text-white hover:bg-red-700' : 'bg-teal-600 text-white hover:bg-teal-700' }`} disabled={submissionStatus === 'submitting' || !userInfo.firstName || !userInfo.lastName || !userInfo.email || !!userInfoErrors.email } > {submissionStatus === 'submitting' && <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>} {submissionStatus === 'submitting' ? 'Envoi en cours...' : submissionStatus === 'error' ? 'Erreur, réessayer ?' : 'Envoyer & Voir Diagnostic'} </button>
-                  </div>
-                  {submissionStatus === 'error' && <p className="text-red-600 text-sm mt-4 text-center max-w-md mx-auto">L'enregistrement a échoué. Veuillez vérifier vos informations ou réessayer.</p>}
-             </div> )}
+             {quizStep === 'userInfo' && (
+               <div className="animate-fade-in">
+                   <h2 className="text-xl font-semibold text-blue-600 mb-6 text-center">Vos informations pour accéder aux résultats</h2>
+                   <div className="space-y-4 mb-8">
+                       <div>
+                           <label htmlFor="firstName" className="block text-sm font-medium text-gray-700 mb-1">Prénom</label>
+                           <input
+                               type="text"
+                               id="firstName"
+                               name="firstName"
+                               value={userInfo.firstName}
+                               onChange={handleUserInfoChange}
+                               className={`w-full px-3 py-2 border rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 ${userInfoErrors.firstName ? 'border-red-500' : 'border-gray-300'}`}
+                               placeholder="Votre prénom"
+                           />
+                           {userInfoErrors.firstName && <p className="text-red-500 text-xs mt-1">{userInfoErrors.firstName}</p>}
+                       </div>
+                       <div>
+                           <label htmlFor="lastName" className="block text-sm font-medium text-gray-700 mb-1">Nom</label>
+                           <input
+                               type="text"
+                               id="lastName"
+                               name="lastName"
+                               value={userInfo.lastName}
+                               onChange={handleUserInfoChange}
+                               className={`w-full px-3 py-2 border rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 ${userInfoErrors.lastName ? 'border-red-500' : 'border-gray-300'}`}
+                               placeholder="Votre nom"
+                           />
+                            {userInfoErrors.lastName && <p className="text-red-500 text-xs mt-1">{userInfoErrors.lastName}</p>}
+                       </div>
+                       <div>
+                           <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">Adresse e-mail</label>
+                           <input
+                               type="email"
+                               id="email"
+                               name="email"
+                               value={userInfo.email}
+                               onChange={handleUserInfoChange}
+                               className={`w-full px-3 py-2 border rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 ${userInfoErrors.email ? 'border-red-500' : 'border-gray-300'}`}
+                               placeholder="exemple@entreprise.com"
+                           />
+                           {userInfoErrors.email && <p className="text-red-500 text-xs mt-1">{userInfoErrors.email}</p>}
+                       </div>
+                   </div>
+
+                   {/* Navigation & Soumission */}
+                   <div className="flex flex-col md:flex-row gap-4 justify-between">
+                       <button onClick={handlePrevious} className="flex items-center justify-center px-4 py-2 rounded text-blue-600 hover:bg-blue-50 transition-colors md:w-auto w-full order-2 md:order-1">
+                           <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7"></path></svg>
+                           Précédent
+                       </button>
+                       <button
+                           onClick={handleSendToAirtable}
+                           className={`px-5 py-3 rounded-lg font-medium transition-all duration-300 ease-in-out flex items-center justify-center md:w-auto w-full order-1 md:order-2 ${
+                             submissionStatus === 'submitting' ? 'bg-yellow-500 text-white cursor-wait' :
+                             submissionStatus === 'error' ? 'bg-red-600 text-white hover:bg-red-700' :
+                             ( !userInfo.firstName || !userInfo.lastName || !userInfo.email || userInfoErrors.email ) ? 'bg-gray-300 text-gray-500 cursor-not-allowed' :
+                             'bg-blue-600 text-white hover:bg-blue-700'
+                           }`}
+                           disabled={submissionStatus === 'submitting' || !userInfo.firstName || !userInfo.lastName || !userInfo.email || !!userInfoErrors.email }
+                       >
+                           {submissionStatus === 'submitting' && <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>}
+                           {submissionStatus === 'submitting' ? 'Envoi en cours...' :
+                            submissionStatus === 'error' ? 'Erreur, réessayer ?' :
+                            'Voir mes résultats & Envoyer'}
+                       </button>
+                   </div>
+                   {submissionStatus === 'error' && <p className="text-red-500 text-sm mt-3 text-center">L'enregistrement a échoué. Veuillez vérifier vos informations ou réessayer.</p>}
+               </div>
+             )}
 
              {/* === ÉTAPE RÉSULTATS === */}
-             {quizStep === 'results' && ( <div className="text-center animate-fade-in"> {/* ... Affichage Score SVG ... */} {/* ... Niveau et Message Maturité ... */} {/* ... Récapitulatif Réponses ... */} {/* ... Bouton Recommencer ... */}
-                  {/* Copier la structure de l'étape résultats des versions précédentes ici */}
-                  <div className="flex justify-center mb-6"> <div className="relative w-40 h-40"> <svg viewBox="0 0 100 100" className="w-full h-full transform -rotate-90"> <circle cx="50" cy="50" r="45" fill="none" stroke="#CCFBF1" strokeWidth="10"/> {/* Couleur adaptée? */} <circle cx="50" cy="50" r="45" fill="none" stroke="#14B8A6" strokeWidth="10" strokeDasharray="283" strokeDashoffset={animateScore && maxScore > 0 ? 283 - (283 * (score / maxScore)) : 283} className="transition-all duration-1000 ease-out" strokeLinecap="round"/> {/* Couleur adaptée? */} </svg> <div className="absolute inset-0 flex items-center justify-center"> <span className={`text-4xl font-bold text-teal-600 transition-opacity duration-500 ${animateScore ? 'opacity-100' : 'opacity-0'}`}> {maxScore > 0 ? Math.round((score / maxScore) * 100) : 0}% </span> </div> </div> </div>
-                  {maturity && ( <> <h2 className="text-2xl md:text-3xl font-bold text-gray-800 mb-2">Maturité Data : {maturity.level}</h2> <p className="text-gray-600 text-lg mb-8">{maturity.message}</p> </> )}
-                  <div className="bg-gray-50 border border-gray-200 p-6 rounded-lg mb-8 text-left max-w-lg mx-auto"> <h3 className="font-semibold text-lg text-gray-800 mb-4">Récapitulatif de vos réponses :</h3> <div className="space-y-4"> {questions.map((q, idx) => ( <div key={q.id}> <p className="font-medium text-gray-700">{q.title}</p> <div className="flex items-start mt-1 pl-4"> <span className="mr-2 text-teal-500 font-semibold">›</span> <span className="text-gray-600"> {answers[idx] !== null ? q.options[answers[idx]].text : <span className="text-gray-400 italic">Sans réponse</span>} </span> </div> </div> ))} </div> </div>
-                  <div className="flex justify-center mt-8"> <button onClick={restart} className="px-6 py-3 border border-teal-600 text-teal-600 rounded-lg hover:bg-teal-50 font-medium transition-colors duration-150"> Recommencer le Quiz </button> </div>
-                  <p className="text-sm text-gray-500 mt-4">Vos réponses ont été enregistrées.</p>
-             </div> )}
+             {quizStep === 'results' && (
+               <div className="text-center animate-fade-in">
+                 {/* Affichage Score */}
+                 <div className="flex justify-center mb-6">
+                   <div className="relative w-40 h-40">
+                     <svg viewBox="0 0 100 100" className="w-full h-full transform -rotate-90">
+                       <circle cx="50" cy="50" r="45" fill="none" stroke="#EEF2FF" strokeWidth="10"/>
+                       <circle cx="50" cy="50" r="45" fill="none" stroke="#2563EB" strokeWidth="10" strokeDasharray="283" strokeDashoffset={animateScore ? 283 - (283 * (score / maxScore)) : 283} className="transition-all duration-1000 ease-out" strokeLinecap="round"/>
+                     </svg>
+                     <div className="absolute inset-0 flex items-center justify-center">
+                        <span className={`text-3xl font-bold text-blue-600 transition-opacity duration-500 ${animateScore ? 'opacity-100' : 'opacity-0'}`}>{Math.round((score/maxScore)*100)}%</span>
+                     </div>
+                   </div>
+                 </div>
+
+                 {/* Niveau et Message */}
+                 {maturity && (
+                    <>
+                       <h2 className="text-2xl font-bold text-blue-600 mb-2">Niveau : {maturity.level}</h2>
+                       <p className="text-gray-600 mb-8">{maturity.message}</p>
+                    </>
+                 )}
+
+                 {/* Récapitulatif */}
+                 <div className="bg-blue-50 p-6 rounded-lg mb-8 text-left">
+                    <h3 className="font-semibold text-blue-800 mb-4">Récapitulatif des réponses :</h3>
+                    <div className="space-y-4">
+                      {questions.map((q, idx) => (
+                        <div key={q.id}>
+                          <p className="font-medium text-blue-700">{q.title}</p>
+                          <div className="flex items-start mt-1">
+                            <span className="mr-2 text-blue-500">›</span>
+                            <span className="text-gray-700">
+                              {answers[idx]!=null ? q.options[answers[idx]].text : <span className="text-gray-400 italic">Sans réponse</span>}
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                 </div>
+
+                 {/* Bouton Recommencer */}
+                 <div className="flex justify-center">
+                   <button onClick={restart} className="px-5 py-3 border border-blue-600 text-blue-600 rounded-lg hover:bg-blue-50 font-medium transition-colors">
+                     Recommencer le Quiz
+                   </button>
+                 </div>
+                 <p className="text-sm text-gray-500 mt-4">Vos résultats ont été enregistrés.</p>
+               </div>
+             )}
           </div>
 
           {/* Footer */}
-          <div className="text-center text-gray-500 text-xs py-4 border-t border-gray-200 mt-8">
-             © {new Date().getFullYear()} | Votre Entreprise - Diagnostic Data Flotte
+          <div className="text-center text-gray-500 text-sm py-4 border-t border-gray-100 mt-8">
+            © {new Date().getFullYear()} | Quiz Data Flotte
           </div>
+
+          {/* Style pour l'animation fade-in simple */}
+          <style>{`
+            @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+            .animate-fade-in { animation: fadeIn 0.5s ease-out forwards; }
+          `}</style>
         </div>
       );
     } // Fin du composant TechInfraQuiz
