@@ -46,6 +46,47 @@
           { id: 5, title: "Enjeu prioritaire", question: "Quel est votre principal enjeu aujourd'hui concernant votre flotte ?", options: [{ text: "Réduire les coûts (TCO, carburant, maintenance)", score: 1 }, { text: "Réduire l'impact environnemental (CO2, ZFE)", score: 3 }, { text: "Préparer la conformité réglementaire (LOM, bilan GES)", score: 2 }, { text: "Optimiser la gestion opérationnelle (pilotage, digitalisation)", score: 1 }], airtableFieldName: "EnjeuPrioritaire" }
       ];
 
+      // Ajout de l'objet personalizedFeedback ici
+      const personalizedFeedback = {
+        // Question 1: Taille de flotte
+        "TailleFlotte": {
+          "Moins de 20": "Même avec une petite flotte, l'impact environnemental peut être optimisé. Nous proposons des solutions adaptées à votre taille pour maximiser l'efficacité RSE.",
+          "Entre 20 et 100": "Votre flotte de taille moyenne présente un excellent potentiel de transformation écologique. Notre accompagnement personnalisé permet une transition en douceur.",
+          "Entre 100 et 500": "Avec une flotte importante, chaque amélioration a un impact significatif. Notre expertise vous aide à prioriser les actions à fort retour sur investissement environnemental.",
+          "Plus de 500": "La gestion d'une grande flotte nécessite une approche structurée. Nos solutions d'entreprise vous permettent de déployer une stratégie RSE à grande échelle."
+        },
+        
+        // Question 2: Mix énergétique
+        "MixEnergetique": {
+          "100% thermique": "Nous vous accompagnons dans la définition d'une roadmap complète pour initier votre transition vers une flotte à faible émission, adaptée à vos contraintes d'exploitation.",
+          "Majoritairement thermique, quelques hybrides/électriques": "Vous avez amorcé la transition ! Notre accompagnement vous aide à accélérer le déploiement de véhicules propres et à optimiser votre mix énergétique.",
+          "Mix équilibré thermique/électrique": "Votre avancée est remarquable. Nous pouvons vous aider à franchir la prochaine étape avec des outils de pilotage avancés et une vision stratégique à long terme.",
+          "Majoritairement ou 100% électrique": "Félicitations pour votre flotte exemplaire ! Nous pouvons vous accompagner dans l'optimisation opérationnelle et le déploiement d'infrastructures de recharge."
+        },
+        
+        // Question 3: Suivi des émissions CO2
+        "SuiviCO2": {
+          "Non, jamais": "Le calcul des émissions CO2 est le point de départ essentiel de toute démarche RSE. Nous vous proposons une méthodologie complète pour initier ce suivi de manière simple.",
+          "Oui, ponctuellement": "Le passage à un suivi régulier de vos émissions vous permettra de mesurer précisément l'impact de vos actions. Notre plateforme facilite l'automatisation de ce suivi.",
+          "Oui, régulièrement": "Votre suivi régulier est une excellente base. Nous pouvons vous aider à analyser ces données pour identifier de nouvelles opportunités de réduction."
+        },
+        
+        // Question 4: Politique RSE Flotte
+        "PolitiqueRSE": {
+          "Non, aucune politique définie": "Nous vous accompagnons de A à Z dans la création d'une stratégie RSE adaptée à votre organisation, avec des objectifs clairs et atteignables.",
+          "Projet en cours": "Nous pouvons vous accompagner pour accélérer et structurer votre projet grâce à notre expertise et nos outils dédiés à la transition écologique des flottes.",
+          "Oui, avec objectifs chiffrés": "Votre politique formalisée est un atout majeur. Nous pouvons vous aider à optimiser vos objectifs et à déployer les meilleures solutions pour les atteindre."
+        },
+        
+        // Question 5: Enjeu prioritaire
+        "EnjeuPrioritaire": {
+          "Réduire les coûts (TCO, carburant, maintenance)": "La réduction des coûts et la performance environnementale sont compatibles ! Notre approche TCO vous permet d'atteindre ces deux objectifs simultanément.",
+          "Réduire l'impact environnemental (CO2, ZFE)": "Votre priorité environnementale démontre votre engagement. Nous proposons des solutions concrètes pour réduire vos émissions tout en maîtrisant vos coûts.",
+          "Préparer la conformité réglementaire (LOM, bilan GES)": "Les exigences réglementaires évoluent rapidement. Notre expertise juridique et technique vous permet d'anticiper ces changements en toute sérénité.",
+          "Optimiser la gestion opérationnelle (pilotage, digitalisation)": "L'optimisation opérationnelle est un levier majeur de performance RSE. Nos outils digitaux transforment vos données en actions concrètes."
+        }
+      };
+
       const totalQuestions = questions.length;
       const maxScore = 17; // Le score max possible
 
@@ -361,10 +402,9 @@
 
             {/* === ÉTAPE RÉSULTATS === */}
             {quizStep === 'results' && (
-              <div className="text-center animate-fade-in"> {/* Animation */}
+              <div className="text-center animate-fade-in">
                 {/* Affichage Score */}
                 <div className="flex justify-center mb-6">
-                  {/* ... (SVG du score inchangé) ... */}
                   <div className="relative w-40 h-40">
                     <svg viewBox="0 0 100 100" className="w-full h-full transform -rotate-90">
                       <circle cx="50" cy="50" r="45" fill="none" stroke="#EEF2FF" strokeWidth="10"/>
@@ -384,26 +424,36 @@
                    </>
                 )}
 
-                {/* Récapitulatif */}
+                {/* Récapitulatif avec messages personnalisés */}
                 <div className="bg-blue-50 p-6 rounded-lg mb-8 text-left">
-                   {/* ... (Affichage récapitulatif inchangé) ... */}
                    <h3 className="font-semibold text-blue-800 mb-4">Récapitulatif des réponses :</h3>
-                   <div className="space-y-4">
-                     {questions.map((q, idx) => (
-                       <div key={q.id}>
-                         <p className="font-medium text-blue-700">{q.title}</p>
-                         <div className="flex items-start mt-1">
-                           <span className="mr-2 text-blue-500">›</span>
-                           <span className="text-gray-700">
-                             {answers[idx]!=null ? q.options[answers[idx]].text : <span className="text-gray-400 italic">Sans réponse</span>}
-                           </span>
+                   <div className="space-y-6">
+                     {questions.map((q, idx) => {
+                       const answerText = answers[idx] != null ? q.options[answers[idx]].text : "Sans réponse";
+                       const feedbackMessage = answers[idx] != null && q.airtableFieldName && personalizedFeedback[q.airtableFieldName] && 
+                                              personalizedFeedback[q.airtableFieldName][answerText];
+                       
+                       return (
+                         <div key={q.id} className={answers[idx] != null ? "pb-4 border-b border-blue-100" : ""}>
+                           <p className="font-medium text-blue-700">{q.title}</p>
+                           <div className="flex items-start mt-1">
+                             <span className="mr-2 text-blue-500">›</span>
+                             <span className="text-gray-700">
+                               {answerText || <span className="text-gray-400 italic">Sans réponse</span>}
+                             </span>
+                           </div>
+                           {feedbackMessage && (
+                             <div className="mt-2 ml-5 p-3 bg-white rounded-lg border-l-4 border-blue-500">
+                               <p className="text-gray-600 text-sm">{feedbackMessage}</p>
+                             </div>
+                           )}
                          </div>
-                       </div>
-                     ))}
+                       );
+                     })}
                    </div>
                 </div>
 
-                 {/* Boutons - MODIFIÉ POUR AJOUTER LE BOUTON RDV */}
+                 {/* Boutons */}
                  <div className="flex flex-col md:flex-row gap-4 justify-center">
                    <button onClick={restart} className="px-5 py-3 border border-blue-600 text-blue-600 rounded-lg hover:bg-blue-50 font-medium transition-colors w-full md:w-auto">
                      Recommencer le Quiz
@@ -416,7 +466,6 @@
                    </a>
                  </div>
                  <p className="text-sm text-gray-500 mt-4">Vos résultats ont été enregistrés.</p>
-
               </div>
             )}
           </div>
