@@ -57,6 +57,47 @@
         }
       ];
 
+      // Ajout de l'objet personalizedFeedback pour les messages personnalisés
+      const personalizedFeedback = {
+        // Question 1: Taille de la flotte
+        "TailleFlotte": {
+          "< 20": "Même avec une petite flotte, l'optimisation peut générer des économies significatives. Nos solutions s'adaptent parfaitement à votre échelle et peuvent réduire vos coûts opérationnels jusqu'à 12%.",
+          "20-100": "Votre flotte de taille moyenne présente un excellent potentiel d'optimisation. Notre plateforme vous permettra de réduire jusqu'à 15% vos coûts opérationnels.",
+          "100-500": "Avec cette taille de flotte, chaque 1% d'optimisation se traduit par des économies importantes. Nos solutions d'entreprise sont dimensionnées pour maximiser votre ROI.",
+          "> 500": "La gestion d'une grande flotte nécessite des outils avancés. Notre suite logistique intégrée permet de centraliser vos données et d'optimiser l'ensemble de vos opérations."
+        },
+        
+        // Question 2: Visibilité temps‑réel
+        "VisibiliteTempsReel": {
+          "0 %": "L'implémentation d'une solution télématique est le premier levier d'optimisation. Nous pouvons vous accompagner dans le déploiement progressif de cette technologie essentielle.",
+          "< 50 %": "Vous avez amorcé la digitalisation de votre flotte. Nous pouvons vous aider à accélérer le déploiement et à exploiter pleinement les données déjà disponibles.",
+          "Environ 75 %": "Votre niveau de visibilité est bon. La prochaine étape consiste à transformer ces données en actions concrètes grâce à nos algorithmes d'optimisation.",
+          "100 %": "Excellente infrastructure de visibilité! Nos outils d'intelligence artificielle peuvent maintenant exploiter cette richesse de données pour optimiser vos décisions en temps réel."
+        },
+        
+        // Question 3: Mesure du taux de chargement
+        "MesureTauxChargement": {
+          "Non": "La mesure du taux de chargement est un indicateur clé d'optimisation. Notre méthodologie éprouvée vous permettra d'établir cette mesure et d'identifier rapidement les améliorations possibles.",
+          "Oui, ponctuellement": "Votre suivi ponctuel est un bon début. Notre plateforme peut automatiser cette mesure et vous fournir des analyses régulières pour maximiser l'utilisation de vos véhicules.",
+          "Oui, suivi régulier": "Votre suivi régulier démontre votre maturité. Nos algorithmes prédictifs peuvent désormais vous aider à anticiper les besoins et à optimiser proactivement vos chargements."
+        },
+        
+        // Question 4: Politique d'optimisation tournée
+        "OptimisationTournee": {
+          "Non": "L'optimisation des tournées peut réduire jusqu'à 20% vos kilomètres parcourus. Nous pouvons vous aider à implémenter une solution adaptée à vos contraintes opérationnelles.",
+          "Projet en cours": "Votre projet d'optimisation est sur la bonne voie. Notre expertise peut accélérer son déploiement et maximiser son impact sur vos opérations.",
+          "Oui, outil en place": "Avec un outil déjà en place, vous êtes bien positionné. Nos services d'audit peuvent évaluer son efficacité et identifier des opportunités d'optimisation complémentaires."
+        },
+        
+        // Question 5: Enjeu prioritaire aujourd'hui
+        "EnjeuPrioritaireLogistique": {
+          "Réduire les kms à vide": "La réduction des kilomètres à vide est un objectif stratégique. Nos algorithmes de backhaul et notre réseau de partenaires peuvent transformer ces trajets improductifs en opportunités de revenus.",
+          "Améliorer la ponctualité (OTIF)": "L'amélioration de l'OTIF impacte directement la satisfaction client. Notre plateforme de prévision des ETA intègre le trafic en temps réel et optimise les créneaux de livraison.",
+          "Réduire le coût gasoil/TCO": "La réduction du TCO passe par une approche holistique. Notre solution combine optimisation des itinéraires, formation à l'éco-conduite et maintenance prédictive pour des économies globales.",
+          "Préparer la décarbonation": "La décarbonation est un enjeu stratégique. Notre méthodologie d'optimisation multi-énergies vous accompagne vers une transition progressive et économiquement viable."
+        }
+      };
+
       const totalQuestions = questions.length;
       const [answers, setAnswers] = useState(Array(totalQuestions).fill(null));
 
@@ -294,7 +335,7 @@
                </div>
              )}
 
-             {/* === ÉTAPE RÉSULTATS === */}
+             {/* === ÉTAPE RÉSULTATS AVEC MESSAGES PERSONNALISÉS === */}
              {quizStep === 'results' && (
                <div className="text-center animate-fade-in">
                  {/* Affichage Score */}
@@ -318,25 +359,36 @@
                     </>
                  )}
 
-                 {/* Récapitulatif */}
+                 {/* Récapitulatif avec messages personnalisés */}
                  <div className="bg-blue-50 p-6 rounded-lg mb-8 text-left">
                     <h3 className="font-semibold text-blue-800 mb-4">Récapitulatif des réponses :</h3>
-                    <div className="space-y-4">
-                      {questions.map((q, idx) => (
-                        <div key={q.id}>
-                          <p className="font-medium text-blue-700">{q.title}</p>
-                          <div className="flex items-start mt-1">
-                            <span className="mr-2 text-blue-500">›</span>
-                            <span className="text-gray-700">
-                              {answers[idx]!=null ? q.options[answers[idx]].text : <span className="text-gray-400 italic">Sans réponse</span>}
-                            </span>
+                    <div className="space-y-6">
+                      {questions.map((q, idx) => {
+                        const answerText = answers[idx] != null ? q.options[answers[idx]].text : "Sans réponse";
+                        const feedbackMessage = answers[idx] != null && q.airtableFieldName && personalizedFeedback[q.airtableFieldName] && 
+                                              personalizedFeedback[q.airtableFieldName][answerText];
+                        
+                        return (
+                          <div key={q.id} className={answers[idx] != null ? "pb-4 border-b border-blue-100" : ""}>
+                            <p className="font-medium text-blue-700">{q.title}</p>
+                            <div className="flex items-start mt-1">
+                              <span className="mr-2 text-blue-500">›</span>
+                              <span className="text-gray-700">
+                                {answerText || <span className="text-gray-400 italic">Sans réponse</span>}
+                              </span>
+                            </div>
+                            {feedbackMessage && (
+                              <div className="mt-2 ml-5 p-3 bg-white rounded-lg border-l-4 border-blue-500">
+                                <p className="text-gray-600 text-sm">{feedbackMessage}</p>
+                              </div>
+                            )}
                           </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                  </div>
 
-                 {/* Boutons - MODIFIÉ POUR AJOUTER LE BOUTON RDV */}
+                 {/* Boutons */}
                  <div className="flex flex-col md:flex-row gap-4 justify-center">
                    <button onClick={restart} className="px-5 py-3 border border-blue-600 text-blue-600 rounded-lg hover:bg-blue-50 font-medium transition-colors w-full md:w-auto">
                      Recommencer le Quiz
