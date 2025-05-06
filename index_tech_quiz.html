@@ -61,6 +61,47 @@
         }
       ];
 
+      // Ajout de l'objet personalizedFeedback pour les messages personnalisés
+      const personalizedFeedback = {
+        // Question 1: Taille de la flotte
+        "TailleFlotte": {
+          "Moins de 20": "Même avec une petite flotte, la digitalisation apporte des bénéfices significatifs. Notre solution adaptée aux TPE/PME permet d'implémenter une infrastructure data complète avec un investissement mesuré et un ROI rapide.",
+          "Entre 20 et 100": "Cette taille de flotte représente un excellent ratio investissement/bénéfice pour les projets data. Notre plateforme évolutive vous permet de déployer progressivement les briques technologiques selon vos priorités.",
+          "Entre 100 et 500": "Une flotte de cette taille génère un volume de données significatif. Notre approche modulaire vous permet d'établir une architecture data solide et évolutive, capable de s'adapter à l'augmentation de votre parc.",
+          "Plus de 500": "La gestion des données d'une grande flotte exige une architecture robuste. Notre solution Enterprise vous permet de gérer des millions de points de données par jour, tout en garantissant performance et sécurité."
+        },
+        
+        // Question 2: Équipement télématique
+        "EquipementTelematique": {
+          "0 %": "L'absence de boîtiers connectés constitue un point de départ. Notre stratégie de déploiement progressif permet d'équiper vos véhicules prioritaires en premier pour valider rapidement le ROI avant un déploiement plus large.",
+          "< 25 %": "Vous avez initié la connectivité de votre flotte. Notre approche peut accélérer ce déploiement tout en mettant en place l'infrastructure data nécessaire pour exploiter pleinement ces premiers capteurs.",
+          "25-75 %": "Votre niveau de connectivité est significatif. L'enjeu actuel est de centraliser et standardiser ces données pour en extraire une valeur métier concrète grâce à notre plateforme unifiée.",
+          "> 75 %": "Votre flotte est largement connectée, un atout considérable. Notre expertise permet maintenant de transformer ce flux de données brutes en insights actionnables pour optimiser vos opérations."
+        },
+        
+        // Question 3: Intégration SI
+        "IntegrationSI": {
+          "Non": "L'intégration des données flotte dans vos systèmes d'information est une étape fondamentale. Notre architecture API-first facilite cette connexion avec vos outils existants sans nécessiter de refonte majeure.",
+          "Partielle": "Votre intégration partielle est un bon point de départ. Notre approche middleware peut combler les gaps d'intégration et unifier votre écosystème data sans perturber les flux existants.",
+          "Intégration complète": "Votre intégration complète démontre votre maturité data. Notre plateforme d'analyse avancée peut maintenant exploiter ces données consolidées pour générer des insights prédictifs à forte valeur ajoutée."
+        },
+        
+        // Question 4: Gouvernance & sécurité
+        "GouvernanceData": {
+          "Non": "La gouvernance des données est un fondement essentiel dans tout projet data. Notre framework RGPD/cybersécurité clé en main vous permet d'implémenter rapidement les bonnes pratiques et de sécuriser votre infrastructure.",
+          "Projet": "Votre projet de gouvernance data est une excellente initiative. Notre expertise peut accélérer sa mise en œuvre en intégrant les spécificités du secteur automobile et les dernières exigences réglementaires.",
+          "Oui, politique claire": "Votre politique de gouvernance data structurée est un atout majeur. Nos solutions de monitoring continu et d'audit automatisé peuvent renforcer cette politique et assurer sa conformité permanente."
+        },
+        
+        // Question 5: Enjeu prioritaire Tech
+        "EnjeuPrioritaireTech": {
+          "Fiabiliser la qualité data": "La qualité des données est fondamentale pour toute initiative data. Notre solution de Data Quality Management automatise la détection d'anomalies et la standardisation des données, améliorant la fiabilité de vos insights de 40% en moyenne.",
+          "Renforcer cybersécurité": "La cybersécurité est devenue critique pour les flottes connectées. Notre approche de sécurité multicouche protège l'ensemble de votre chaîne de données, des véhicules jusqu'aux applications métier, avec un monitoring continu.",
+          "Automatiser workflows (maintenance/FAV)": "L'automatisation des workflows opérationnels génère des gains d'efficacité importants. Notre plateforme intègre des algorithmes de maintenance prédictive réduisant les temps d'immobilisation jusqu'à 25%.",
+          "Supporter l'électrification (battery monitoring)": "Le monitoring des batteries est essentiel pour optimiser votre flotte électrique. Notre solution IoT dédiée permet de surveiller l'état de santé des batteries en temps réel et d'optimiser les cycles de recharge pour maximiser leur durée de vie."
+        }
+      };
+
       const totalQuestions = questions.length;
       const [answers, setAnswers] = useState(Array(totalQuestions).fill(null));
 
@@ -298,7 +339,7 @@
                </div>
              )}
 
-             {/* === ÉTAPE RÉSULTATS === */}
+             {/* === ÉTAPE RÉSULTATS AVEC MESSAGES PERSONNALISÉS === */}
              {quizStep === 'results' && (
                <div className="text-center animate-fade-in">
                  {/* Affichage Score */}
@@ -322,25 +363,36 @@
                     </>
                  )}
 
-                 {/* Récapitulatif */}
+                 {/* Récapitulatif avec messages personnalisés */}
                  <div className="bg-blue-50 p-6 rounded-lg mb-8 text-left">
                     <h3 className="font-semibold text-blue-800 mb-4">Récapitulatif des réponses :</h3>
-                    <div className="space-y-4">
-                      {questions.map((q, idx) => (
-                        <div key={q.id}>
-                          <p className="font-medium text-blue-700">{q.title}</p>
-                          <div className="flex items-start mt-1">
-                            <span className="mr-2 text-blue-500">›</span>
-                            <span className="text-gray-700">
-                              {answers[idx]!=null ? q.options[answers[idx]].text : <span className="text-gray-400 italic">Sans réponse</span>}
-                            </span>
+                    <div className="space-y-6">
+                      {questions.map((q, idx) => {
+                        const answerText = answers[idx] != null ? q.options[answers[idx]].text : "Sans réponse";
+                        const feedbackMessage = answers[idx] != null && q.airtableFieldName && personalizedFeedback[q.airtableFieldName] && 
+                                              personalizedFeedback[q.airtableFieldName][answerText];
+                        
+                        return (
+                          <div key={q.id} className={answers[idx] != null ? "pb-4 border-b border-blue-100" : ""}>
+                            <p className="font-medium text-blue-700">{q.title}</p>
+                            <div className="flex items-start mt-1">
+                              <span className="mr-2 text-blue-500">›</span>
+                              <span className="text-gray-700">
+                                {answerText || <span className="text-gray-400 italic">Sans réponse</span>}
+                              </span>
+                            </div>
+                            {feedbackMessage && (
+                              <div className="mt-2 ml-5 p-3 bg-white rounded-lg border-l-4 border-blue-500">
+                                <p className="text-gray-600 text-sm">{feedbackMessage}</p>
+                              </div>
+                            )}
                           </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                  </div>
 
-                 {/* Boutons - MODIFIÉ POUR AJOUTER LE BOUTON RDV */}
+                 {/* Boutons */}
                  <div className="flex flex-col md:flex-row gap-4 justify-center">
                    <button onClick={restart} className="px-5 py-3 border border-blue-600 text-blue-600 rounded-lg hover:bg-blue-50 font-medium transition-colors w-full md:w-auto">
                      Recommencer le Quiz
@@ -361,12 +413,6 @@
           <div className="text-center text-gray-500 text-sm py-4 border-t border-gray-100 mt-8">
             © {new Date().getFullYear()} | Quiz Data Flotte
           </div>
-
-          {/* Style pour l'animation fade-in simple */}
-          <style>{`
-            @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-            .animate-fade-in { animation: fadeIn 0.5s ease-out forwards; }
-          `}</style>
         </div>
       );
     } // Fin du composant TechInfraQuiz
